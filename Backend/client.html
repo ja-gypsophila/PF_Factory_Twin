@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <title>WS 테스트</title>
+  </head>
+  <body>
+    <h3>실시간 센서 데이터</h3>
+    <pre id="log"></pre>
+
+    <script>
+      const log = (msg) => {
+        const el = document.getElementById("log");
+        el.textContent = msg + "\n" + el.textContent;
+      };
+
+      const ws = new WebSocket("ws://localhost:8080");
+
+      ws.onopen = () => log("연결됨 ✅ - 데이터 수신 대기 중 ...");
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        data.machines.forEach((m) => {
+          log(
+            `[${data.timestamp}] ${m.machineId} - 상태: ${m.status}, 온도: ${m.temperature}°C, 생산량: ${m.metrics.totalCount}(양품 ${m.metrics.goodCount}/불량 ${m.metrics.defectCount})`,
+          );
+        });
+      };
+      ws.onclose = () => log("연결 종료");
+    </script>
+  </body>
+</html>
