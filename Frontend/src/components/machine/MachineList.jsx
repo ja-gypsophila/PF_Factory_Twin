@@ -1,8 +1,6 @@
 import MachineCard from "./MachineCard";
 
 export default function MachineList({ data }) {
-  console.log(data);
-
   return (
     <div>
       {data && (

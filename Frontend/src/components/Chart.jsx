@@ -39,26 +39,24 @@ export default function Chart({ data, history }) {
     });
   }, [history]);
   return (
-    <div className="w-full h-300">
-      <ResponsiveContainer>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray={"3 3"} />
-          <XAxis dataKey="time" />
-          <YAxis domain={[0, 100]} />
-          <Tooltip />
-          <Legend />
-          {machineIds.map((machineId, index) => (
-            <Line
-              key={machineId}
-              type="monotone"
-              dataKey={machineId}
-              stroke={LINE_COLORS[index % LINE_COLORS.length]}
-              dot={false}
-              isAnimationActive={false}
-            />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <ResponsiveContainer>
+      <LineChart data={chartData}>
+        <CartesianGrid strokeDasharray={"3 3"} />
+        <XAxis dataKey="time" />
+        <YAxis domain={[0, 100]} />
+        <Tooltip />
+        <Legend />
+        {machineIds.map((machineId, index) => (
+          <Line
+            key={machineId}
+            type="monotone"
+            dataKey={machineId}
+            stroke={LINE_COLORS[index % LINE_COLORS.length]}
+            dot={false}
+            isAnimationActive={false}
+          />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
   );
 }
