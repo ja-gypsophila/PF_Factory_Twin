@@ -1,8 +1,18 @@
 const { WebSocketServer } = require('ws');
 
-const TICK_INTERVAL_MS = 1000;
+const TICK_INTERVAL_MS = 3000;
 const TICK_INTERVAL_SEC = TICK_INTERVAL_MS / 1000;
 const MACHINE_IDS = ['M-001', 'M-002', 'M-003', 'M-004'];
+
+// 설비 목표치 (서버에서 관리). 클라이언트는 이 값으로 현재값 대비 달성/미달을 판정한다.
+const DEFAULT_TARGETS = {
+    oee: 0.80,           // 목표 종합효율 (실측 평균 ~0.82 → 평소 달성, 가끔 미달)
+    availability: 0.88,  // 목표 가동률 (실측 평균 ~0.90)
+    performance: 0.90,   // 목표 성능 (실측 평균 ~0.92)
+    quality: 0.98,       // 목표 품질 (불량률 2% 이내, 실측 ~0.99)
+    tempWarning: 38,     // 온도 경고 임계치 (°C)
+    tempCritical: 43,    // 온도 위험 임계치 (°C) — 상한 45 미만이라 도달 가능
+};
 
 const wss = new WebSocketServer({ port: 8080 });
 console.log(`서버 실행중: ws://localhost:${wss.address().port}`);
@@ -29,6 +39,7 @@ function pickNextStatus() {
 
 const machines = MACHINE_IDS.map((machineId) => ({
     machineId,
+    targets: { ...DEFAULT_TARGETS }, // 설비별 목표치 (필요 시 머신마다 다르게 조정 가능)
     status: 'RUNNING',
     statusTicksRemaining: randomInt(5, 15),
     idealCycleTimeSec: 2 + Math.random() * 2, // 머신별 고정 이상 사이클타임 (2~4초)
@@ -61,7 +72,7 @@ function tick(machine) {
         while (machine.unitProgress >= 1) {
             machine.unitProgress -= 1;
             machine.totalCount += 1;
-            if (Math.random() < 0.03) { // 3% 불량률
+            if (Math.random() < 0.01) { // 1% 불량률 (품질 ~99%, 목표 98% 평소 달성)
                 machine.defectCount += 1;
             } else {
                 machine.goodCount += 1;
@@ -81,6 +92,7 @@ setInterval(() => {
         timestamp: new Date().toISOString(),
         machines: machines.map((m) => ({
             machineId: m.machineId,
+            targets: m.targets,
             status: m.status,
             temperature: m.temperature.toFixed(2),
             metrics: {
