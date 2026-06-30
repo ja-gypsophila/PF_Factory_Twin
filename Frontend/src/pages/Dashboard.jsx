@@ -1,9 +1,9 @@
 import MachineList from "../components/machine/MachineList";
 import Chart from "../components/Chart";
-import { useWebSocket } from "../hook/useWebSocket";
+import { useWebSocketContext } from "../context/WebSocketProvider";
 
 export default function Dashboard() {
-  const { data, history } = useWebSocket("ws://localhost:8080");
+  const { data, status, history } = useWebSocketContext();
   return (
     <div className="flex flex-col justify-center pt-15 gap-15">
       <h2 className="text-center text-2xl font-bold mb-4">
