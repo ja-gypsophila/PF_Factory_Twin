@@ -1,6 +1,6 @@
-import { calculateOee } from "../../utils/oee";
+import { calculateOee } from "../../utils/calculateOee";
 import { STATUS_COLOR, STATUS_LABEL } from "./../../constants/machineStatus";
-import { getGrade } from "./../../utils/grade";
+import { getGrade } from "./../../utils/getGrade";
 import { Link } from "react-router-dom";
 
 export default function MachineCard({ machine }) {

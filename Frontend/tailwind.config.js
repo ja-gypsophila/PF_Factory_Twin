@@ -10,6 +10,11 @@ export default {
   theme: {
     extend: {
       spacing: pxSpacing,
+      fontSize: pxSpacing,
+      fontFamily: {
+        sans: ["Pretendard Variable", "Pretendard", "system-ui", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
+      },
     },
   },
   plugins: [],
