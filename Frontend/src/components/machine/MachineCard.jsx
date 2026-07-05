@@ -1,5 +1,5 @@
 import { calculateOee } from "../../utils/calculateOee";
-import { STATUS_COLOR, STATUS_LABEL } from "./../../constants/machineStatus";
+import { STATUS_COLOR, STATUS_LABEL } from "../../constants/MACHINE_STATUS";
 import { getGrade } from "./../../utils/getGrade";
 import { Link } from "react-router-dom";
 

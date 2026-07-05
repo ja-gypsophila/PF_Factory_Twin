@@ -3,20 +3,42 @@ import {
   Line,
   XAxis,
   YAxis,
-  CartesianGrid,
   Tooltip,
   Legend,
   ResponsiveContainer,
+  CartesianGrid,
+  ReferenceLine,
 } from "recharts";
 
-export default function LineChart({ data, xKey, series, yDomain, unit }) {
+export default function LineChart({
+  data,
+  xKey,
+  series,
+  yDomain,
+  unit,
+  refLine,
+}) {
   return (
     <ResponsiveContainer>
+      {/* 부모 크기에 맞춤 (부모에 높이 필수!) */}
       <ReLineChart data={data}>
-        <XAxis dataKey={xKey} />
-        <YAxis domain={yDomain} unit={unit} />
-        <Tooltip />
-        <Legend />
+        {/* 차트 본체 + 데이터 주입 */}
+        <CartesianGrid vertical={false} strokeDasharray={"3 3"} />{" "}
+        {/* 배경 격자 */}
+        <XAxis dataKey={xKey} /> {/* 가로축: 데이터의 어떤 필드를 쓸지 */}
+        <YAxis domain={yDomain} unit={unit} padding={{ bottom: 12 }} />
+        {/* 세로축 */}
+        <Tooltip /> {/* 마우스 올리면 값 표시 */}
+        <Legend /> {/* 범례 */}
+        {refLine != null && (
+          <ReferenceLine
+            y={refLine}
+            stroke="#f59e0b"
+            strokeDasharray={"3 3"}
+            strokeWidth={1}
+          />
+        )}
+        {/* 실제 선: 어떤 필드를 그릴지 */}
         {series.map((s) => (
           <Line
             key={s.key}
@@ -26,6 +48,7 @@ export default function LineChart({ data, xKey, series, yDomain, unit }) {
             stroke={s.color}
             dot={false}
             isAnimationActive={false}
+            unit={unit}
           />
         ))}
       </ReLineChart>

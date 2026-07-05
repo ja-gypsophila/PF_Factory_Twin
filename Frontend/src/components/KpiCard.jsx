@@ -1,21 +1,30 @@
 import { ChevronUp, ChevronDown } from "lucide-react";
-export default function KpiCard({ label, current, unit, target, good }) {
-  // const GapColor = Gap > 0 === good ? "text-[#34d399]" : "text-[#f87171]";
-  const calcGap = current - target;
+
+export default function KpiCard({
+  label,
+  current,
+  unit,
+  target,
+  good,
+  dec = 1,
+}) {
+  const calcGap = Number((current - target).toFixed(dec));
+  const isGood = good ? calcGap >= 0 : calcGap <= 0;
+  const gapColor = isGood ? "text-[#34d399]" : "text-[#f87171]";
 
   return (
     <div className="flex flex-col items-start bg-slate-500 w-full">
       <div>{label}</div>
       <div className="text-25">
-        {current}
+        {Number(current).toFixed(dec)}
         {unit}
       </div>
       <div>
-        목표 {target}
+        목표 {Number(target).toFixed(dec)}
         {unit}
       </div>
       <div className="">
-        <div className="flex items-center">
+        <div className={`flex items-center ${gapColor}`}>
           <div>
             {calcGap > 0 ? (
               <ChevronUp size={12} strokeWidth={2.5} stroke="currentColor" />
@@ -24,7 +33,7 @@ export default function KpiCard({ label, current, unit, target, good }) {
             )}
           </div>
           <span>
-            {Number(calcGap.toFixed(1))}
+            {calcGap}
             {unit}
           </span>
         </div>

@@ -171,6 +171,17 @@ function tick(machine) {
     updateTemperature(machine);                  // 온도 갱신
 }
 
+//  최근 7일 가짜 생산량
+const dailyProduction = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - i)); // 6일 전 ~ 오늘
+    return {
+        date: date.toISOString().slice(0, 10),        // "2026-07-05"
+        total: randomInt(11000, 14000),               // 그날 총 생산
+        defect: randomInt(150, 400),                  // 그날 불량
+    };
+});
+
 // ────────────────────────────────────────────────────────────
 // 6. 전송용 데이터 변환
 // ────────────────────────────────────────────────────────────
@@ -204,6 +215,7 @@ setInterval(() => {
     broadcast({             // ② 결과를 모든 클라이언트에 전송
         timestamp: new Date().toISOString(),
         machines: machines.map(serializeMachine),
+        dailyProduction
     });
 }, TICK_INTERVAL_MS);
 

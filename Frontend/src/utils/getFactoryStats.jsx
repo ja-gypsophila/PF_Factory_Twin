@@ -9,7 +9,6 @@ export default function getFactoryStats(machines) {
   const acc = machines.reduce(
     (acc, machine) => {
       const { metrics, targets, status } = machine; // 기계 한 대에서 필요한 3덩어리 꺼냄
-      console.log(machines);
 
       // ── 생산 수량 누적 ──
       acc.totalCount += metrics.totalCount; // 총 생산량(양품+불량) 합
@@ -38,6 +37,9 @@ export default function getFactoryStats(machines) {
       // 목표 품질(불량률 목표 계산에 씀). 기계마다 같다고 보고 마지막 값 저장
       acc.qualityTarget = targets.quality;
 
+      // 설비 가동률
+      acc.availabilityTargetSum += targets.availability;
+
       return acc;
     },
     // ↓ 누적 초기값 (모든 합계는 0에서 시작)
@@ -48,6 +50,7 @@ export default function getFactoryStats(machines) {
       runTime: 0, // 가동시간 누적
       oeeSum: 0, // OEE 합 (평균용)
       oeeTargetSum: 0, // 목표 OEE 합 (평균용)
+      availabilityTargetSum: 0, // 목표 설비 가동률
       targetCount: 0, // 목표 생산량 누적
       runningCount: 0, // 가동 설비 수
       stoppedCount: 0, // 정지 설비 수
@@ -58,21 +61,20 @@ export default function getFactoryStats(machines) {
   const n = machines.length; // 전체 기계 수 (평균 낼 때 나눔)
 
   return {
-    // ▶ OEE 카드
-    avgOee: acc.oeeSum / n, // 현재 평균 OEE (0~1) → 화면선 ×100 해서 %
-    targetOee: acc.oeeTargetSum / n, // 목표 평균 OEE (0~1)
+    avgOee: (acc.oeeSum / n) * 100, // 82.0
+    targetOee: (acc.oeeTargetSum / n) * 100, // 80
 
-    // ▶ 금일 생산 카드
-    totalCount: acc.totalCount, // 현재 총 생산량 (개)
-    targetCount: Math.round(acc.targetCount), // 목표 생산량 (개, 소수 반올림)
+    totalCount: acc.totalCount, // 개수는 그대로
+    targetCount: Math.round(acc.targetCount),
 
-    // ▶ 불량률 카드
-    defectRate: acc.totalCount > 0 ? acc.defectCount / acc.totalCount : 0, // 현재 불량률(0~1)
-    targetDefectRate: 1 - acc.qualityTarget, // 목표 불량률(0~1) = 1 − 목표품질(0.98→0.02)
+    defectRate:
+      acc.totalCount > 0 ? (acc.defectCount / acc.totalCount) * 100 : 0, // 1.0
+    targetDefectRate: (1 - acc.qualityTarget) * 100, // 2.0
 
-    // ▶ 설비 가동률 카드
-    availability: acc.plannedTime > 0 ? acc.runTime / acc.plannedTime : 0, // 가동률(0~1)=가동/계획시간
-    runningCount: acc.runningCount, // 가동 설비 수 (예: 5)
-    stoppedCount: acc.stoppedCount, // 정지 설비 수 (예: 3)
+    availability:
+      acc.plannedTime > 0 ? (acc.runTime / acc.plannedTime) * 100 : 0, // 91.2
+    targetAvailability: (acc.availabilityTargetSum / n) * 100,
+    runningCount: acc.runningCount,
+    stoppedCount: acc.stoppedCount,
   };
 }
