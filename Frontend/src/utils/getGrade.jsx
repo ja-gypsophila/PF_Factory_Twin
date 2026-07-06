@@ -1,5 +1,7 @@
+import { getLevel, LEVEL_TEXT, LEVEL_LABEL } from "../theme/levels";
+
+// OEE(%) → 등급 뱃지 (양호/주의/위험). 색·기준은 theme/levels에서 통제.
 export const getGrade = (oee) => {
-  if (oee >= 90) return <span className="text-green-500  font-bold">양호</span>;
-  if (oee >= 70) return <span className="text-yellow-500 font-bold">주의</span>;
-  return <span className="text-red-500 font-bold">위험</span>;
+  const level = getLevel("oee", oee);
+  return <span className={`${LEVEL_TEXT[level]} font-bold`}>{LEVEL_LABEL[level]}</span>;
 };

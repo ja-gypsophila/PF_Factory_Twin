@@ -2,7 +2,42 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 전체 높이 확보 (대시보드가 화면을 꽉 채우도록) */
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  @apply font-sans;
+  @apply font-sans bg-slate-900 text-gray-50;
+
+  /* 폰트 렌더링 부드럽게 */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* 브라우저 기본 UI(스크롤바, 폼 등)를 다크로 */
+  color-scheme: dark;
+}
+
+/* 스크롤바 (다크 톤) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-slate-900;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-700 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-600;
+}
+
+/* 링크 기본 스타일 초기화 (react-router Link 등) */
+a {
+  color: inherit;
+  text-decoration: none;
 }

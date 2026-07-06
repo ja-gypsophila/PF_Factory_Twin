@@ -25,7 +25,7 @@ const SIM = {
     // 생산 관련
     cycleTimeSecRange: [2, 4],     // 이상적으로 1개 만드는 시간(초). 기계마다 고정
     performanceRange: [0.75, 1.0], // 성능 계수: 이상 속도의 75~100% (평균 ~87%, 변동 폭 넓힘)
-    defectRate: 0.02,              // 불량률 2% (품질 ~98%, 목표에 붙임)
+    defectRate: 0.1,              // 불량률 10% (품질 ~90%, 목표에 붙임)
 
     // 온도 관련 (°C)
     startTemp: 25,             // 시작 온도
@@ -91,6 +91,8 @@ function createMachine(machineId) {
         unitProgress: 0,                  // 다음 1개 완성까지 진행률(0~1 누적)
         plannedTimeSec: 0,                // 켜져 있던 총 시간
         runTimeSec: 0,                    // 실제 가동(RUNNING) 시간
+        downCount: 0,                     // 고장 횟수
+        downTimeSec: 0,                   // 수리시간
         totalCount: 0,                    // 총 생산 수
         goodCount: 0,                     // 양품 수
         defectCount: 0,                   // 불량 수
@@ -123,6 +125,10 @@ function advanceStatus(machine) {
         const next = pickNextStatus();
         machine.status = next.status;
         machine.statusHoldTicksLeft = next.holdTicks;
+
+        if (next.status === "DOWN") {
+            machine.downCount += 1; // 새 고장 발생 시 1회 카운트
+        }
     }
     machine.statusHoldTicksLeft -= 1;
 }
@@ -167,7 +173,10 @@ function tick(machine) {
     advanceStatus(machine);                      // 상태 전환
     if (machine.status === 'RUNNING') {
         produce(machine);                        // 생산 (가동 중에만)
+    } else if (machine.status === 'DOWN') {
+        machine.downTimeSec += TICK_INTERVAL_SEC; // 수리(정지) 시간 누적
     }
+
     updateTemperature(machine);                  // 온도 갱신
 }
 
@@ -197,6 +206,8 @@ function serializeMachine(machine) {
         metrics: {
             plannedTimeSec: Number(machine.plannedTimeSec.toFixed(1)),
             runTimeSec: Number(machine.runTimeSec.toFixed(1)),
+            downCount: machine.downCount,
+            downTimeSec: Number(machine.downTimeSec.toFixed(1)),
             idealCycleTimeSec: Number(machine.idealCycleTimeSec.toFixed(2)),
             totalCount: machine.totalCount,
             goodCount: machine.goodCount,

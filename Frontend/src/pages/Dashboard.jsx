@@ -14,7 +14,7 @@ export default function Dashboard() {
   const stats = useMemo(() => getFactoryStats(data?.machines), [data]);
 
   const chartOEE = useMemo(() => {
-    return history.map((tick, i) => ({
+    return history.map((tick) => ({
       time: formatTimestamp(tick.timestamp),
       avgOee: getFactoryStats(tick.machines)?.avgOee.toFixed(1) ?? 0,
     }));
@@ -94,7 +94,7 @@ export default function Dashboard() {
             series={machinesOEE}
             yDomain={[0, 100]}
             unit={"%"}
-            refLine={50}
+            refLine={stats?.targetOee}
           />
         </div>
         <div className="w-full h-300">

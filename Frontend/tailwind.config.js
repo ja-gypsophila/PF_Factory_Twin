@@ -15,6 +15,13 @@ export default {
         sans: ["Pretendard Variable", "Pretendard", "system-ui", "sans-serif"],
         mono: ["ui-monospace", "SFMono-Regular", "Consolas", "monospace"],
       },
+      colors: {
+        ok: "#10b981",
+        warning: "#f59e0b",
+        danger: "#f43f5e",
+        accent: "#a78bfa",
+        info: "#22d3ee"
+      }
     },
   },
   plugins: [],

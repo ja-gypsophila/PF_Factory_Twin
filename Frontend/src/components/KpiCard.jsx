@@ -1,4 +1,5 @@
 import { ChevronUp, ChevronDown } from "lucide-react";
+import { LEVEL_TEXT } from "../theme/levels";
 
 export default function KpiCard({
   label,
@@ -10,7 +11,7 @@ export default function KpiCard({
 }) {
   const calcGap = Number((current - target).toFixed(dec));
   const isGood = good ? calcGap >= 0 : calcGap <= 0;
-  const gapColor = isGood ? "text-[#34d399]" : "text-[#f87171]";
+  const gapColor = isGood ? LEVEL_TEXT.ok : LEVEL_TEXT.danger;
 
   return (
     <div className="flex flex-col items-start bg-slate-500 w-full">

@@ -17,6 +17,7 @@ export default function LineChart({
   yDomain,
   unit,
   refLine,
+  legend = true,
 }) {
   return (
     <ResponsiveContainer>
@@ -29,7 +30,8 @@ export default function LineChart({
         <YAxis domain={yDomain} unit={unit} padding={{ bottom: 12 }} />
         {/* 세로축 */}
         <Tooltip /> {/* 마우스 올리면 값 표시 */}
-        <Legend /> {/* 범례 */}
+        {legend ? <Legend /> : ""}
+        {/* 범례 */}
         {refLine != null && (
           <ReferenceLine
             y={refLine}
