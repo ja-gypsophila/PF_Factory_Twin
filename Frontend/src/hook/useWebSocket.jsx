@@ -26,7 +26,7 @@ export function useWebSocket(url) {
       socket.onmessage = (e) => {
         const newData = JSON.parse(e.data);
         setData(newData);
-        setHistory((prevHistory) => [...prevHistory, newData].slice(-20)); // 새로운 데이터를 이력에 추가
+        setHistory((prevHistory) => [...prevHistory, newData].slice(-50)); // 새로운 데이터를 이력에 추가
       };
     };
 

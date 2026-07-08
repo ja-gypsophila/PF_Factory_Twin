@@ -8,11 +8,15 @@ import { formatMinSec } from "../utils/formatMinSec";
 import ProgressBar from "../components/ProgressBar";
 import StatTile from "../components/StatTile";
 import { getLevelTextClass } from "../theme/levels";
+import AreaChart from "../components/charts/AreaChart";
+import { TYPE_SENSORS } from "../constants/TYPE_SENSORS";
 
 export default function MachineDetail() {
   const { id } = useParams();
   const { data, history } = useWebSocketContext();
   const machine = data?.machines.find((m) => m.machineId === id);
+  const sensors = TYPE_SENSORS[machine?.type] ?? [];
+
   // 데이터 도착 전 / 잘못된 id 가드
   if (!machine) {
     return (
@@ -42,7 +46,7 @@ export default function MachineDetail() {
       ? (metrics.defectCount / metrics.totalCount) * 100
       : 0;
 
-  // 이 설비의 OEE / 온도 추이 (history 기반)
+  // 이 설비의 OEE / 온도 추이 (history 기반) / 시간별 생산량
   const oeeTrend = history.map((tick) => {
     const m = tick.machines.find((x) => x.machineId === id);
     return {
@@ -59,12 +63,15 @@ export default function MachineDetail() {
     };
   });
 
-  // 목표 생산량 = 이론상 최대 × 목표 OEE
-  const theoreticalMax =
-    metrics.idealCycleTimeSec > 0
-      ? metrics.plannedTimeSec / metrics.idealCycleTimeSec
-      : 0;
-  const targetCount = Math.round(theoreticalMax * targets.oee);
+  const chartProduction = (machine.hourProduction ?? []).map((prod) => ({
+    time: prod.hour,
+    생산: prod.prod,
+  }));
+
+  const hoursProduction = [{ key: "생산", color: "#3b82f6" }];
+
+  // 목표 생산량 = 서버가 관리하는 고정 목표 (매 틱 안 변함)
+  const targetCount = targets.dailyCount;
 
   return (
     <div className="flex flex-col gap-6 px-[8vw] py-8">
@@ -73,7 +80,9 @@ export default function MachineDetail() {
         <Link to="/" className="text-gray-400 hover:text-white text-xl">
           ←
         </Link>
-        <h1 className="text-2xl font-bold">{id}</h1>
+        <h1 className="text-2xl font-bold">
+          {id} {machine?.name}
+        </h1>
         <span
           className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[machine.status]}`}
         >
@@ -90,8 +99,21 @@ export default function MachineDetail() {
         <StatTile label="불량" value={metrics.defectCount} unit="ea" />
         <StatTile label="불량률" value={defectRate.toFixed(1)} unit="%" />
       </div>
-      {/* ── 차트: OEE 추이 / 온도 ── */}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {sensors.map((s) => (
+          <StatTile
+            key={s.key}
+            label={s.label}
+            value={machine.sensor[s.key]?.toFixed(1)}
+            unit={s.unit}
+          />
+        ))}
+      </div>
+
+      {/* ── 차트 ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* OEE 추이 */}
         <div className="border border-gray-700 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-gray-300 mb-2">OEE 추이</h3>
           <div className="w-full h-250">
@@ -106,7 +128,7 @@ export default function MachineDetail() {
             />
           </div>
         </div>
-
+        {/* 온도 추이 */}
         <div className="border border-gray-700 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-gray-300 mb-2">
             온도 추이
@@ -124,6 +146,7 @@ export default function MachineDetail() {
           </div>
         </div>
 
+        {/* 시간별 생산량  */}
         <div className="border border-gray-700 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-gray-300 mb-2">
             시간별 생산량
@@ -132,14 +155,11 @@ export default function MachineDetail() {
             금일 목표 {targetCount}ea
           </span>
           <div className="w-full h-250">
-            <LineChart
-              data={tempTrend}
+            <AreaChart
+              data={chartProduction}
               xKey="time"
-              series={[{ key: "온도", color: "#f97316" }]}
-              yDomain={[20, 50]}
-              legend={false}
-              unit="°C"
-              refLine={targets.tempWarning}
+              series={hoursProduction}
+              unit="ea"
             />
           </div>
         </div>
@@ -202,32 +222,41 @@ export default function MachineDetail() {
             </div>
           </div>
         </div>
-      </div>
-      {/* ── 상태 이력 로그 ── */}
-      <div className="border border-gray-700 rounded-lg p-4">
-        <h3 className="text-sm font-semibold text-gray-300 mb-2">상태 이력</h3>
-        <div className="flex flex-col gap-1 font-mono text-sm">
-          {[...history].reverse().map((tick) => {
-            const m = tick.machines.find((x) => x.machineId === id);
-            if (!m) return null;
-            return (
-              <div
-                key={tick.timestamp}
-                className="flex gap-4 border-b border-gray-800 py-1 text-gray-300"
-              >
-                <span className="text-gray-500">
-                  {formatTimestamp(tick.timestamp)}
-                </span>
-                <span className={`px-1.5 rounded ${STATUS_COLOR[m.status]}`}>
-                  {STATUS_LABEL[m.status]}
-                </span>
-                <span>생산 {m.metrics.totalCount}</span>
-                <span>불량 {m.metrics.defectCount}</span>
-                <span className="ml-auto">{m.temperature}°C</span>
-              </div>
-            );
-          })}
+
+        {/* 금일 이벤트 카드 */}
+        <div>
+          <div>금일 이벤트</div>
+          <div>과부하 감지</div>
         </div>
+
+        {/* ── 상태 이력 로그 ── */}
+        {/* <div className="border border-gray-700 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-300 mb-2">
+            상태 이력
+          </h3>
+          <div className="flex flex-col gap-1 font-mono text-sm">
+            {[...history].reverse().map((tick) => {
+              const m = tick.machines.find((x) => x.machineId === id);
+              if (!m) return null;
+              return (
+                <div
+                  key={tick.timestamp}
+                  className="flex gap-4 border-b border-gray-800 py-1 text-gray-300"
+                >
+                  <span className="text-gray-500">
+                    {formatTimestamp(tick.timestamp)}
+                  </span>
+                  <span className={`px-1.5 rounded ${STATUS_COLOR[m.status]}`}>
+                    {STATUS_LABEL[m.status]}
+                  </span>
+                  <span>생산 {m.metrics.totalCount}</span>
+                  <span>불량 {m.metrics.defectCount}</span>
+                  <span className="ml-auto">{m.temperature}°C</span>
+                </div>
+              );
+            })}
+          </div>
+        </div> */}
       </div>
     </div>
   );

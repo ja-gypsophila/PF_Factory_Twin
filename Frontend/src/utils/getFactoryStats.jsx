@@ -22,12 +22,8 @@ export default function getFactoryStats(machines) {
       acc.oeeSum += calculateOee(metrics).oee; // 각 기계 현재 OEE(0~1)를 더함(→평균낼 것)
       acc.oeeTargetSum += targets.oee; // 각 기계 목표 OEE(0~1)를 더함(→평균낼 것)
 
-      // ── 목표 생산량 = 이론상 최대 생산량 × 목표 OEE ──
-      const theoreticalMax = // 이상 속도로 계획시간 내내 만들 때의 최대 개수
-        metrics.idealCycleTimeSec > 0
-          ? metrics.plannedTimeSec / metrics.idealCycleTimeSec
-          : 0;
-      acc.targetCount += theoreticalMax * targets.oee; // 현실적 목표 생산량 누적
+      // ── 목표 생산량 = 설비별 고정 목표(dailyCount)의 합 ──
+      acc.targetCount += targets.dailyCount; // 서버가 관리하는 고정값 (매 틱 안 변함)
 
       // ── 설비 대수 카운트 ──
       if (status === "RUNNING")

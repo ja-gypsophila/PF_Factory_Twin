@@ -9,6 +9,7 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
+import { Timer } from "lucide-react";
 
 export default function LineChart({
   data,
@@ -29,7 +30,23 @@ export default function LineChart({
         <XAxis dataKey={xKey} /> {/* 가로축: 데이터의 어떤 필드를 쓸지 */}
         <YAxis domain={yDomain} unit={unit} padding={{ bottom: 12 }} />
         {/* 세로축 */}
-        <Tooltip /> {/* 마우스 올리면 값 표시 */}
+        <Tooltip
+          cursor={{ stroke: "#334155" }}
+          labelFormatter={(label) => (
+            <span className="flex items-center gap-5">
+              <Timer size={14} />
+              {label}
+            </span>
+          )} // 시각 (x축 값)
+          contentStyle={{
+            background: "#1e293b", // 다크 배경 (slate-800)
+            border: "1px solid #334155",
+            borderRadius: 8,
+            color: "#f8fafc",
+          }}
+          labelStyle={{ color: "#94a3b8" }} // 시각 라벨 색 (연회색)
+        />
+        {/* 마우스 올리면 값 표시 */}
         {legend ? <Legend /> : ""}
         {/* 범례 */}
         {refLine != null && (
