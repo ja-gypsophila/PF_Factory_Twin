@@ -7,15 +7,30 @@ import LineChart from "../components/charts/LineChart";
 import { formatMinSec } from "../utils/formatMinSec";
 import ProgressBar from "../components/ProgressBar";
 import StatTile from "../components/StatTile";
-import { getLevelTextClass } from "../theme/levels";
+import { getLevelTextClass, LEVEL_TEXT } from "../theme/levels";
 import AreaChart from "../components/charts/AreaChart";
-import { TYPE_SENSORS } from "../constants/TYPE_SENSORS";
+import { TYPE_SENSORS, TYPE_TRENDS } from "../constants/MACHINE_TYPE";
+import { AlertTriangleIcon, CheckCircle2 } from "lucide-react";
+import { getMachineEvents } from "../constants/MACHINE_EVENTS";
 
 export default function MachineDetail() {
   const { id } = useParams();
   const { data, history } = useWebSocketContext();
-  const machine = data?.machines.find((m) => m.machineId === id);
-  const sensors = TYPE_SENSORS[machine?.type] ?? [];
+  const machine = data?.machines.find((item) => item.machineId === id);
+  const sensorConfigs = TYPE_SENSORS[machine?.type] ?? [];
+  const trendConfig = TYPE_TRENDS[machine?.type] ?? null;
+  const getTrendValue = (m) =>
+    m?.sensor?.[trendConfig.key] ?? m?.[trendConfig.key] ?? 0;
+  const currentTrendValue = getTrendValue(machine);
+
+  const LEVEL_ICON = {
+    ok: CheckCircle2,
+    warn: AlertTriangleIcon,
+    danger: AlertTriangleIcon,
+  };
+
+  // 컴포넌트 안
+  const events = getMachineEvents(machine?.type);
 
   // 데이터 도착 전 / 잘못된 id 가드
   if (!machine) {
@@ -31,7 +46,7 @@ export default function MachineDetail() {
     machine.metrics,
   );
   const { runTimeSec, downTimeSec, downCount } = machine.metrics;
-  const { targets, metrics } = machine;
+  const { targets } = machine;
 
   const MIN_FAILURES = 3; // 이만큼 고장이 쌓여야 신뢰할 만한 평균
 
@@ -40,26 +55,24 @@ export default function MachineDetail() {
   const mtbf = hasEnoughData ? runTimeSec / downCount : null; // 시간단위
   const mttr = hasEnoughData ? downTimeSec / downCount : null;
 
-  // 불량률
-  const defectRate =
-    metrics.totalCount > 0
-      ? (metrics.defectCount / metrics.totalCount) * 100
-      : 0;
-
   // 이 설비의 OEE / 온도 추이 (history 기반) / 시간별 생산량
   const oeeTrend = history.map((tick) => {
-    const m = tick.machines.find((x) => x.machineId === id);
+    const m = tick.machines.find((item) => item.machineId === id);
+    const value = m
+      ? Number((calculateOee(m.metrics).oee * 100).toFixed(1))
+      : 0;
     return {
       time: formatTimestamp(tick.timestamp),
-      OEE: m ? Number((calculateOee(m.metrics).oee * 100).toFixed(1)) : 0,
+      OEE: value,
     };
   });
 
   const tempTrend = history.map((tick) => {
-    const m = tick.machines.find((x) => x.machineId === id);
+    const m = tick.machines.find((item) => item.machineId === id);
+
     return {
       time: formatTimestamp(tick.timestamp),
-      온도: m ? m.temperature : 0,
+      [trendConfig.label]: Number(getTrendValue(m)).toFixed(1),
     };
   });
 
@@ -88,20 +101,16 @@ export default function MachineDetail() {
         >
           {STATUS_LABEL[machine.status]}
         </span>
-        <span className="ml-auto text-gray-400">
-          온도 {machine.temperature}°C
-        </span>
-      </div>
-      {/* ── 생산 실적 ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatTile label="총 생산" value={metrics.totalCount} unit="ea" />
-        <StatTile label="양품" value={metrics.goodCount} unit="ea" />
-        <StatTile label="불량" value={metrics.defectCount} unit="ea" />
-        <StatTile label="불량률" value={defectRate.toFixed(1)} unit="%" />
+        {trendConfig && (
+          <span className="ml-auto text-gray-400">
+            {trendConfig.label} {currentTrendValue.toFixed(1)}
+            {trendConfig.unit}
+          </span>
+        )}
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {sensors.map((s) => (
+        {sensorConfigs.map((s) => (
           <StatTile
             key={s.key}
             label={s.label}
@@ -131,18 +140,18 @@ export default function MachineDetail() {
         {/* 온도 추이 */}
         <div className="border border-gray-700 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-gray-300 mb-2">
-            온도 추이
+            {trendConfig.label} 추이
           </h3>
           <div className="w-full h-250">
-            <LineChart
-              data={tempTrend}
-              xKey="time"
-              series={[{ key: "온도", color: "#f97316" }]}
-              yDomain={[20, 50]}
-              legend={false}
-              unit="°C"
-              refLine={targets.tempWarning}
-            />
+            {trendConfig && (
+              <LineChart
+                data={tempTrend}
+                xKey="time"
+                series={[{ key: trendConfig.label, color: "#f97316" }]}
+                legend={false}
+                unit={trendConfig.unit}
+              />
+            )}
           </div>
         </div>
 
@@ -160,6 +169,7 @@ export default function MachineDetail() {
               xKey="time"
               series={hoursProduction}
               unit="ea"
+              legend={false}
             />
           </div>
         </div>
@@ -224,9 +234,28 @@ export default function MachineDetail() {
         </div>
 
         {/* 금일 이벤트 카드 */}
-        <div>
-          <div>금일 이벤트</div>
-          <div>과부하 감지</div>
+        <div className="border border-gray-700 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-gray-400 mb-3">
+            금일 이벤트
+          </h3>
+          <div className="flex flex-col gap-2">
+            {events.map((e, i) => {
+              const Icon = LEVEL_ICON[e.level];
+              return (
+                <div key={i} className="flex items-center gap-3 text-sm">
+                  <span className="text-gray-500 font-mono">{e.time}</span>
+                  <Icon size={16} className={LEVEL_TEXT[e.level]} />
+                  <span
+                    className={
+                      e.level === "ok" ? "text-gray-500" : "text-gray-200"
+                    }
+                  >
+                    {e.text}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── 상태 이력 로그 ── */}

@@ -13,3 +13,15 @@ export const TYPE_SENSORS = {
   ],
   INSPECTION: [{ key: "passRate", label: "검사 통과율", unit: "%" }],
 };
+
+export const TYPE_TRENDS = {
+  PRESS: {
+    key: "temperature",
+    label: "온도",
+    unit: "°C",
+    refKey: "tempWarning",
+  },
+  WELDER: { key: "weldTemp", label: "용접 온도", unit: "°C" },
+  INJECTION: { key: "moldTemp", label: "금형 온도", unit: "°C" },
+  INSPECTION: { key: "passRate", label: "검사 통과율", unit: "%" },
+};
