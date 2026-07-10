@@ -9,6 +9,16 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
+import {
+  GRID_STROKE,
+  AXIS_TICK,
+  AXIS_LINE,
+  CURSOR,
+  TOOLTIP_CONTENT,
+  TOOLTIP_LABEL,
+  LEGEND_STYLE,
+} from "../../theme/chartTheme";
+import { formatCompact } from "../../utils/formatNumber";
 
 export default function AreaChart({
   data,
@@ -21,8 +31,11 @@ export default function AreaChart({
 }) {
   return (
     <ResponsiveContainer>
-      <ReAreaChart data={data}>
-        {/* 1. 그라데이션 정의 (series마다 하나씩) */}
+      <ReAreaChart
+        data={data}
+        margin={{ top: 8, right: 8, bottom: 4, left: -8 }}
+      >
+        {/* 그라데이션 정의 (series마다 하나씩) */}
         <defs>
           {series.map((s) => (
             <linearGradient
@@ -33,31 +46,53 @@ export default function AreaChart({
               x2="0"
               y2="1"
             >
-              <stop offset="5%" stopColor={s.color} stopOpacity={0.4} />
-              <stop offset="95%" stopColor={s.color} stopOpacity={0} />
+              <stop offset="0%" stopColor={s.color} stopOpacity={0.45} />
+              <stop offset="100%" stopColor={s.color} stopOpacity={0} />
             </linearGradient>
           ))}
         </defs>
 
-        <CartesianGrid vertical={false} strokeDasharray="3 3" />
-        <XAxis dataKey={xKey} />
-        <YAxis domain={yDomain} unit={unit} />
-        <Tooltip />
-        {legend && <Legend />}
+        <CartesianGrid
+          vertical={false}
+          stroke={GRID_STROKE}
+          strokeDasharray="3 3"
+        />
+        <XAxis
+          dataKey={xKey}
+          tick={AXIS_TICK}
+          axisLine={AXIS_LINE}
+          tickLine={false}
+          minTickGap={24}
+        />
+        <YAxis
+          domain={yDomain}
+          unit={unit}
+          tick={AXIS_TICK}
+          axisLine={false}
+          tickLine={false}
+          tickFormatter={(v) => formatCompact(v)}
+          width={44}
+        />
+        <Tooltip
+          cursor={CURSOR}
+          contentStyle={TOOLTIP_CONTENT}
+          labelStyle={TOOLTIP_LABEL}
+        />
+        {legend && <Legend wrapperStyle={LEGEND_STYLE} />}
         {refLine != null && (
-          <ReferenceLine y={refLine} stroke="#f59e0b" strokeDasharray="3 3" />
+          <ReferenceLine y={refLine} stroke="#ffb443" strokeDasharray="4 4" />
         )}
 
-        {/* 2+3. Area = 선 + 그라데이션 채우기 */}
+        {/* Area = 선 + 그라데이션 채우기 */}
         {series.map((s) => (
           <Area
             key={s.key}
             type="monotone"
             name={s.name ?? s.key}
             dataKey={s.key}
-            stroke={s.color} // 선 색
+            stroke={s.color}
             strokeWidth={2}
-            fill={`url(#grad-${s.key})`} // ← 아래 채우기에 그라데이션
+            fill={`url(#grad-${s.key})`}
             dot={false}
             isAnimationActive={false}
           />

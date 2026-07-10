@@ -2,15 +2,16 @@ import { Link, useParams } from "react-router-dom";
 import { useWebSocketContext } from "../context/WebSocketProvider";
 import { calculateOee } from "../utils/calculateOee";
 import { formatTimestamp } from "../utils/formatTimestamp";
-import { STATUS_LABEL, STATUS_COLOR } from "../constants/MACHINE_STATUS";
+import { STATUS_LABEL, STATUS_DOT } from "../constants/MACHINE_STATUS";
 import LineChart from "../components/charts/LineChart";
 import { formatMinSec } from "../utils/formatMinSec";
 import ProgressBar from "../components/ProgressBar";
 import StatTile from "../components/StatTile";
-import { getLevelTextClass, LEVEL_TEXT } from "../theme/levels";
+import Panel from "../components/Panel";
+import { getLevel, LEVEL_TEXT } from "../theme/levels";
 import AreaChart from "../components/charts/AreaChart";
 import { TYPE_SENSORS, TYPE_TRENDS } from "../constants/MACHINE_TYPE";
-import { AlertTriangleIcon, CheckCircle2 } from "lucide-react";
+import { AlertTriangleIcon, CheckCircle2, ArrowLeft } from "lucide-react";
 import { getMachineEvents } from "../constants/MACHINE_EVENTS";
 
 export default function MachineDetail() {
@@ -55,6 +56,11 @@ export default function MachineDetail() {
   const mtbf = hasEnoughData ? runTimeSec / downCount : null; // 시간단위
   const mttr = hasEnoughData ? downTimeSec / downCount : null;
 
+  // 병목 설비 기계인지 아닌지 확인 (고정: "INJECTION" 사출기)
+  const isBottleNeck = machine.isBottleneck;
+
+  console.log(isBottleNeck);
+
   // 이 설비의 OEE / 온도 추이 (history 기반) / 시간별 생산량
   const oeeTrend = history.map((tick) => {
     const m = tick.machines.find((item) => item.machineId === id);
@@ -85,32 +91,52 @@ export default function MachineDetail() {
 
   // 목표 생산량 = 서버가 관리하는 고정 목표 (매 틱 안 변함)
   const targetCount = targets.dailyCount;
+  const oeePercent = oee * 100;
+  const oeeLevel = getLevel("oee", oeePercent); // ok | warn | danger
 
   return (
-    <div className="flex flex-col gap-6 px-[8vw] py-8">
+    <div className="mx-auto flex  flex-col gap-5 px-[6vw] py-8">
       {/* ── 헤더 ── */}
-      <div className="flex items-center gap-3 border-b border-gray-700 pb-4">
-        <Link to="/" className="text-gray-400 hover:text-white text-xl">
-          ←
-        </Link>
-        /
-        <h1 className="text-2xl font-bold">
-          {id} {machine?.name}
-        </h1>
-        <span
-          className={`text-xs px-2 py-1 rounded-full ${STATUS_COLOR[machine.status]}`}
+      <div className="flex flex-wrap items-center gap-4 border-b border-hairline pb-5">
+        <Link
+          to="/"
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-hairline text-muted transition-colors hover:border-edge hover:text-ink"
         >
-          {STATUS_LABEL[machine.status]}
-        </span>
-        {trendConfig && (
-          <span className="ml-auto text-gray-400">
-            {trendConfig.label} {currentTrendValue.toFixed(1)}
-            {trendConfig.unit}
+          <ArrowLeft size={16} />
+        </Link>
+
+        <div className="flex items-baseline gap-3">
+          <h1 className="text-2xl font-bold tracking-tight text-ink">
+            {machine.name}
+          </h1>
+          <span className="readout text-sm text-faint">{id}</span>
+        </div>
+
+        {/* LED 상태 뱃지 */}
+        <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-panel px-3 py-1">
+          <span
+            className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT[machine.status]}`}
+          />
+          <span className="hud-label !tracking-[0.12em] text-ink">
+            {STATUS_LABEL[machine.status]}
           </span>
+        </span>
+
+        {trendConfig && (
+          <div className="ml-auto flex items-baseline gap-2">
+            <span className="hud-label">{trendConfig.label}</span>
+            <span className="readout text-lg font-semibold text-ink">
+              {currentTrendValue.toFixed(1)}
+              <span className="ml-0.5 text-xs text-faint">
+                {trendConfig.unit}
+              </span>
+            </span>
+          </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* ── 종류별 센서 리드아웃 ── */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {sensorConfigs.map((s) => (
           <StatTile
             key={s.key}
@@ -121,135 +147,125 @@ export default function MachineDetail() {
         ))}
       </div>
 
-      {/* ── 차트 ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* ── 차트/지표 그리드 ── */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* OEE 추이 */}
-        <div className="border border-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-300 mb-2">OEE 추이</h3>
-          <div className="w-full h-250">
+        <Panel
+          title="OEE 추이"
+          accent={oeeLevel}
+          right={`목표 ${(targets.oee * 100).toFixed(0)}%`}
+        >
+          <div className="h-150 w-full">
             <LineChart
               data={oeeTrend}
               xKey="time"
-              series={[{ key: "OEE", name: "OEE", color: "#3b82f6" }]}
+              series={[{ key: "OEE", name: "OEE", color: "#38e0ff" }]}
               yDomain={[0, 100]}
               legend={false}
               unit="%"
               refLine={targets.oee * 100}
             />
           </div>
-        </div>
-        {/* 온도 추이 */}
-        <div className="border border-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-300 mb-2">
-            {trendConfig.label} 추이
-          </h3>
-          <div className="w-full h-250">
+        </Panel>
+
+        {/* 종류별 대표 지표 추이 */}
+        <Panel title={`${trendConfig?.label ?? "지표"} 추이`} accent="accent">
+          <div className="h-150 w-full">
             {trendConfig && (
               <LineChart
                 data={tempTrend}
                 xKey="time"
-                series={[{ key: trendConfig.label, color: "#f97316" }]}
+                series={[{ key: trendConfig.label, color: "#ffb443" }]}
                 legend={false}
                 unit={trendConfig.unit}
               />
             )}
           </div>
-        </div>
+        </Panel>
 
-        {/* 시간별 생산량  */}
-        <div className="border border-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-300 mb-2">
-            시간별 생산량
-          </h3>
-          <span className="text-sm font-semibold text-gray-300 mb-2">
-            금일 목표 {targetCount}ea
-          </span>
-          <div className="w-full h-250">
+        {/* 시간별 생산량 */}
+        <Panel
+          title="시간별 생산량"
+          accent="accent"
+          right={`금일 목표 ${targetCount}ea`}
+        >
+          <div className="h-150 w-full">
             <AreaChart
               data={chartProduction}
               xKey="time"
               series={hoursProduction}
-              unit="ea"
               legend={false}
             />
           </div>
-        </div>
+        </Panel>
 
-        {/* oee 구성 요소 카드 */}
-        <div className="flex flex-col p-[2vw] border-s-white border rounded-lg">
-          {/* Header */}
-          <div className="flex justify-between">
-            <div>OEE 구성 요소</div>
-            <div
-              className={`text-25 ${getLevelTextClass("oee", (oee * 100).toFixed(1))}`}
+        {/* OEE 구성 요소 */}
+        <Panel
+          title="OEE 구성 요소"
+          accent={oeeLevel}
+          right={
+            <span
+              className={`readout text-lg font-bold ${LEVEL_TEXT[oeeLevel]}`}
             >
-              {(oee * 100).toFixed(1)}
-            </div>
-          </div>
+              {oeePercent.toFixed(1)}%
+            </span>
+          }
+          bodyClassName="flex flex-col gap-4"
+        >
+          <ProgressBar
+            label="가용성 (Availability)"
+            value={(availability * 100).toFixed(1)}
+            metric="availability"
+          />
+          <ProgressBar
+            label="성능 (Performance)"
+            value={(performance * 100).toFixed(1)}
+            metric="performance"
+          />
+          <ProgressBar
+            label="품질 (Quality)"
+            value={(quality * 100).toFixed(1)}
+            metric="quality"
+          />
 
-          {/*  Body */}
-          <div>
-            <ProgressBar
-              label={"가용성 (Availability)"}
-              value={(availability * 100).toFixed(1)}
-              metric="availability"
-            />
-          </div>
-          <div>
-            <ProgressBar
-              label={"성능 (Performance)"}
-              value={(performance * 100).toFixed(1)}
-              metric="performance"
-            />
-          </div>
-          <div>
-            <ProgressBar
-              label={"품질 (Quality)"}
-              value={(quality * 100).toFixed(1)}
-              metric="quality"
-            />
-          </div>
-          {/* footer */}
-          <div className="flex">
-            <div className="flex flex-col">
-              <div>가동 시간</div>
-              <div>{formatMinSec(runTimeSec)}</div>
+          {/* 신뢰성 지표 리드아웃 */}
+          <div className="mt-1 grid grid-cols-3 gap-2 border-t border-hairline pt-3">
+            <div className="flex flex-col gap-1">
+              <span className="hud-label">가동 시간</span>
+              <span className="readout text-sm text-ink">
+                {formatMinSec(runTimeSec)}
+              </span>
             </div>
-            <div className="flex flex-col">
-              <div>MTBF</div>
-              <div>
+            <div className="flex flex-col gap-1">
+              <span className="hud-label">MTBF</span>
+              <span className="readout text-sm text-ink">
                 {mtbf == null
-                  ? `측정 중 (${downCount}/${MIN_FAILURES})`
+                  ? `측정 중 ${downCount}/${MIN_FAILURES}`
                   : formatMinSec(mtbf)}
-              </div>
+              </span>
             </div>
-            <div className="flex flex-col">
-              <div>MTTR</div>
-              <div>
+            <div className="flex flex-col gap-1">
+              <span className="hud-label">MTTR</span>
+              <span className="readout text-sm text-ink">
                 {mttr == null
-                  ? `측정 중 (${downCount}/${MIN_FAILURES})`
+                  ? `측정 중 ${downCount}/${MIN_FAILURES}`
                   : formatMinSec(mttr)}
-              </div>
+              </span>
             </div>
           </div>
-        </div>
+        </Panel>
 
-        {/* 금일 이벤트 카드 */}
-        <div className="border border-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-400 mb-3">
-            금일 이벤트
-          </h3>
-          <div className="flex flex-col gap-2">
+        {/* 금일 이벤트 (전체 폭) */}
+        <Panel title="금일 이벤트" accent="warn" className="lg:col-span-2">
+          <div className="flex flex-col divide-y divide-hairline">
             {events.map((e, i) => {
               const Icon = LEVEL_ICON[e.level];
               return (
-                <div key={i} className="flex items-center gap-3 text-sm">
-                  <span className="text-gray-500 font-mono">{e.time}</span>
-                  <Icon size={16} className={LEVEL_TEXT[e.level]} />
+                <div key={i} className="flex items-center gap-3 py-2 text-sm">
+                  <span className="readout text-xs text-faint">{e.time}</span>
+                  <Icon size={15} className={LEVEL_TEXT[e.level]} />
                   <span
-                    className={
-                      e.level === "ok" ? "text-gray-500" : "text-gray-200"
-                    }
+                    className={e.level === "ok" ? "text-muted" : "text-ink"}
                   >
                     {e.text}
                   </span>
@@ -257,36 +273,7 @@ export default function MachineDetail() {
               );
             })}
           </div>
-        </div>
-
-        {/* ── 상태 이력 로그 ── */}
-        {/* <div className="border border-gray-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-gray-300 mb-2">
-            상태 이력
-          </h3>
-          <div className="flex flex-col gap-1 font-mono text-sm">
-            {[...history].reverse().map((tick) => {
-              const m = tick.machines.find((x) => x.machineId === id);
-              if (!m) return null;
-              return (
-                <div
-                  key={tick.timestamp}
-                  className="flex gap-4 border-b border-gray-800 py-1 text-gray-300"
-                >
-                  <span className="text-gray-500">
-                    {formatTimestamp(tick.timestamp)}
-                  </span>
-                  <span className={`px-1.5 rounded ${STATUS_COLOR[m.status]}`}>
-                    {STATUS_LABEL[m.status]}
-                  </span>
-                  <span>생산 {m.metrics.totalCount}</span>
-                  <span>불량 {m.metrics.defectCount}</span>
-                  <span className="ml-auto">{m.temperature}°C</span>
-                </div>
-              );
-            })}
-          </div>
-        </div> */}
+        </Panel>
       </div>
     </div>
   );

@@ -7,6 +7,8 @@ import { useClock } from "../hook/useClock";
 import getFactoryStats from "../utils/getFactoryStats";
 import { formatTimestamp } from "../utils/formatTimestamp";
 import BarChart from "../components/charts/BarChart";
+import AreaChart from "../components/charts/AreaChart";
+import Panel from "../components/Panel";
 
 export default function Dashboard() {
   const { data, status, history } = useWebSocketContext();
@@ -20,7 +22,12 @@ export default function Dashboard() {
     }));
   }, [history]);
 
-  const chartProduction = (data?.dailyProduction ?? []).map((d) => ({
+  const hourProdTrend = (data?.lineHourProduction ?? []).map((h) => ({
+    hour: h.hour,
+    생산량: h.prod,
+  }));
+
+  const dailyProdTrend = (data?.dailyProduction ?? []).map((d) => ({
     day: formatTimestamp(d.date, "date"),
     생산량: d.total,
     불량: d.defect,
@@ -30,10 +37,12 @@ export default function Dashboard() {
     { key: "avgOee", name: "공장 평균 OEE", color: "#3b82f6" },
   ];
 
-  const dailyProduction = [
+  const dailyProd = [
     { key: "생산량", color: "#3b82f6" },
     { key: "불량", color: "red" },
   ];
+
+  const hourProd = [{ key: "생산량", color: "#3b82f6" }];
 
   return (
     <div className="flex flex-col justify-center gap-15">
@@ -97,11 +106,27 @@ export default function Dashboard() {
             refLine={stats?.targetOee}
           />
         </div>
+
+        <Panel
+          title={"시간대 생산량"}
+          accent={"accent"}
+          right={`금일 목표 ${stats.targetCount}ea`}
+        >
+          <div className="w-full h-300">
+            <AreaChart
+              data={hourProdTrend}
+              xKey={"hour"}
+              series={hourProd}
+              legend={false}
+            />
+          </div>
+        </Panel>
+
         <div className="w-full h-300">
           <BarChart
-            data={chartProduction}
+            data={dailyProdTrend}
             xKey={"day"}
-            series={dailyProduction}
+            series={dailyProd}
             unit={"ea"}
           />
         </div>

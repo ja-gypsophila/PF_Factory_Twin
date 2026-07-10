@@ -8,6 +8,7 @@ import {
   CartesianGrid,
   Bar,
 } from "recharts";
+import { formatCompact } from "../../utils/formatNumber";
 
 export default function BarChart({ data, xKey, series, yDomain, unit }) {
   return (
@@ -17,7 +18,13 @@ export default function BarChart({ data, xKey, series, yDomain, unit }) {
         {/* 차트 본체 + 데이터 주입 */}
         <CartesianGrid /> {/* 배경 격자 */}
         <XAxis dataKey={xKey} /> {/* 가로축: 데이터의 어떤 필드를 쓸지 */}
-        <YAxis domain={yDomain} unit={unit} width={80} /> {/* 세로축 */}
+        <YAxis
+          domain={yDomain}
+          unit={unit}
+          tickFormatter={(v) => formatCompact(v)}
+          width={80}
+        />{" "}
+        {/* 세로축 */}
         <Tooltip /> {/* 마우스 올리면 값 표시 */}
         <Legend /> {/* 범례 */}
         {/* 실제 선: 어떤 필드를 그릴지 */}

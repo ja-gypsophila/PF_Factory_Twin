@@ -11,32 +11,96 @@ body,
 
 body {
   margin: 0;
-  @apply font-sans bg-slate-900 text-gray-50;
+  @apply font-sans bg-base text-ink;
 
-  /* 폰트 렌더링 부드럽게 */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  /* 브라우저 기본 UI(스크롤바, 폼 등)를 다크로 */
   color-scheme: dark;
 }
 
-/* 스크롤바 (다크 톤) */
+/* ────────────────────────────────────────────────────────────
+   관제실(SCADA) 분위기: 청사진 그리드 + 비네트 + 스캔라인 + 그레인
+   고정 배경 레이어 (콘텐츠 뒤, 스크롤 무관)
+   ──────────────────────────────────────────────────────────── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-color: #080b10;
+  background-image:
+    /* 중앙 시안 글로우 */
+    radial-gradient(120% 80% at 50% -10%, rgba(56, 224, 255, 0.06), transparent 60%),
+    /* 청사진 그리드 (세로) */
+    linear-gradient(to right, rgba(120, 160, 200, 0.045) 1px, transparent 1px),
+    /* 청사진 그리드 (가로) */
+    linear-gradient(to bottom, rgba(120, 160, 200, 0.045) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
+}
+
+/* 스캔라인 + 가장자리 비네트 (아주 미묘하게) */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.12) 3px
+    ),
+    radial-gradient(130% 110% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+}
+
+/* ────────────────────────────────────────────────────────────
+   재사용 유틸리티 (design system)
+   ──────────────────────────────────────────────────────────── */
+@layer components {
+  /* 시그니처 패널: 반투명 표면 + 얇은 테두리 + 입체 그림자 */
+  .panel {
+    @apply relative rounded-md border border-hairline bg-panel/80 shadow-panel backdrop-blur-sm;
+  }
+
+  /* HMI 라벨: 소문자 대문자화 + 넓은 자간 + 흐린 색 */
+  .hud-label {
+    @apply text-[11px] font-medium uppercase tracking-[0.18em] text-faint;
+  }
+
+  /* 수치 리드아웃: 모노 + 표(tabular) 정렬 숫자 */
+  .readout {
+    @apply font-mono tabular-nums tracking-tight;
+  }
+}
+
+@layer utilities {
+  /* 숫자 자릿수 흔들림 방지 */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ── 스크롤바 (HMI 톤) ── */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  @apply bg-slate-900;
+  background: #080b10;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-700 rounded-full;
+  background: #1e2a38;
+  border-radius: 6px;
+  border: 2px solid #080b10;
 }
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-slate-600;
+  background: #2b3a4d;
 }
 
-/* 링크 기본 스타일 초기화 (react-router Link 등) */
+/* 링크 기본 초기화 */
 a {
   color: inherit;
   text-decoration: none;

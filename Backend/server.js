@@ -51,7 +51,32 @@ const DEFAULT_TARGETS = {
     quality: 0.98,       // 목표 품질 (실측 평균 ~0.98)
     tempWarning: 38,     // 온도 경고 임계치 (°C)
     tempCritical: 43,    // 온도 위험 임계치 (°C) — 상한 45 미만이라 도달 가능
-    dailyCount: 500,    // 설비당 하루 목표 생산량 (고정값, 매 틱 재계산 X)
+    dailyCount: 5000,    // 설비당 하루 목표 생산량 (고정값, 매 틱 재계산 X)
+};
+
+// ────────────────────────────────────────────────────────────
+// 순차 라인 구성 (고정 병목)
+//   프레스 → 용접 → 사출 → 검사  (앞 공정이 만든 만큼만 뒤 공정이 처리)
+//   라인 속도는 "가장 느린 설비(병목)"가 결정하고,
+//   각 공정을 통과할 때마다 수율만큼 양품이 줄어든다.
+// ────────────────────────────────────────────────────────────
+const LINE_ORDER = ["PRESS", "WELDER", "INJECTION", "INSPECTION"]; // 공정 순서
+const BOTTLENECK_TYPE = "INJECTION"; // 사출기 = 고정 병목 (시간당 능력 최저)
+
+// 설비별 시간당 처리 능력 (병목이 가장 낮음)
+const HOURLY_CAPACITY = {
+    PRESS: [560, 640],
+    WELDER: [540, 620],
+    INJECTION: [400, 460], // ← 병목 (최저) → 라인 속도를 결정
+    INSPECTION: [520, 600],
+};
+
+// 공정별 수율 (통과하며 불량 제거 → 뒤로 갈수록 양품 감소)
+const STAGE_YIELD = {
+    PRESS: 1.0,
+    WELDER: 0.99,
+    INJECTION: 0.98,
+    INSPECTION: 0.97,
 };
 
 // ────────────────────────────────────────────────────────────
@@ -98,7 +123,7 @@ function createMachine({ machineId, name, type }) {
         sensor: makeTypeSensors(type),
         targets: { ...DEFAULT_TARGETS },  // 목표치 복사본 (설비마다 따로 조정 가능하도록)
         status: 'RUNNING',                // 시작은 가동 중
-        hourProduction: makeHourProduction(), // 설비 별 고유 시드
+        // hourProduction / isBottleneck 은 라인 생성 후 아래에서 주입
         statusHoldTicksLeft: randomInt(...SIM.runHoldTicks), // 현재 상태를 몇 틱 더 유지할지
         idealCycleTimeSec: randomFloat(...SIM.cycleTimeSecRange), // 이상 사이클타임(고정)
         unitProgress: 0,                  // 다음 1개 완성까지 진행률(0~1 누적)
@@ -128,6 +153,13 @@ function makeTypeSensors(type) {
 // const machines = MACHINE_IDS.map(createMachine);
 
 const machines = MACHINE_SPECS.map(createMachine)
+
+// 라인 시간별 생산량을 한 번 생성해서 각 설비에 분배 (설비 간 정합 보장)
+const { perType: lineByType, lineSeries: lineHourProduction } = makeLineHourProduction();
+machines.forEach((m) => {
+    m.hourProduction = lineByType[m.type] ?? []; // 이 설비의 시간별 생산량
+    m.isBottleneck = m.type === BOTTLENECK_TYPE;  // 병목 설비 여부
+});
 
 
 // ────────────────────────────────────────────────────────────
@@ -228,13 +260,40 @@ const dailyProduction = Array.from({ length: 7 }, (_, i) => {
     };
 });
 
-// 설비 시간별 생산
-function makeHourProduction() {
-    return Array.from({ length: 12 }, (_, i) => ({
-        hour: `${i + 8}시`,                    // 8시~19시
-        prod: randomInt(300, 500),             // 설비마다 랜덤 생산량
-    }));
+// 순차 라인의 시간별 생산량을 "한 번에" 생성 (설비 간 정합 보장)
+//  - 매 시간 라인 처리량 = 병목(사출기) 능력이 결정
+//  - 앞 공정부터 순서대로 수율을 적용 → 뒤로 갈수록 양품 감소
+//  - 각 값은 누적(우상향)
+// 반환: { perType: { PRESS:[{hour,prod}], ... }, lineSeries:[{hour,prod}] }
+function makeLineHourProduction() {
+    const cum = {};        // 공정별 누적
+    const perType = {};    // 공정별 시간 시리즈
+    LINE_ORDER.forEach((t) => {
+        cum[t] = 0;
+        perType[t] = [];
+    });
 
+    let lineCum = 0;
+    const lineSeries = []; // 라인 최종 산출(=검사 통과) 누적
+
+    for (let i = 0; i < 12; i++) {
+        const hour = `${i + 8}시`; // 8시~19시
+
+        // 그 시간대 라인 흐름량 = 병목 설비가 정한 처리량
+        let flow = randomInt(...HOURLY_CAPACITY[BOTTLENECK_TYPE]);
+
+        // 앞 공정 → 뒤 공정 순서로 수율 적용 (통과할 때마다 양품 감소)
+        for (const type of LINE_ORDER) {
+            flow = Math.round(flow * STAGE_YIELD[type]);
+            cum[type] += flow;
+            perType[type].push({ hour, prod: cum[type] });
+        }
+
+        lineCum += flow; // 마지막 flow = 검사 통과량 = 라인 산출
+        lineSeries.push({ hour, prod: lineCum });
+    }
+
+    return { perType, lineSeries };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -248,6 +307,7 @@ function serializeMachine(machine) {
         machineId: machine.machineId,
         name: machine.name,
         type: machine.type,
+        isBottleneck: machine.isBottleneck, // 병목 설비 여부
         sensor: machine.sensor,
         targets: machine.targets,
         hourProduction: machine.hourProduction,
@@ -277,7 +337,7 @@ setInterval(() => {
         timestamp: new Date().toISOString(),
         machines: machines.map(serializeMachine),
         dailyProduction,
-
+        lineHourProduction, // 라인 전체 시간별 산출(=검사 통과) — 대시보드용
     });
 }, TICK_INTERVAL_MS);
 
