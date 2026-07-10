@@ -59,7 +59,7 @@ export default function AreaChart({
             strokeWidth={2}
             fill={`url(#grad-${s.key})`} // ← 아래 채우기에 그라데이션
             dot={false}
-            isAnimationActive={true}
+            isAnimationActive={false}
           />
         ))}
       </ReAreaChart>

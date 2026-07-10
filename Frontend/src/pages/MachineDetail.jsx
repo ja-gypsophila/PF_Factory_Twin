@@ -72,7 +72,7 @@ export default function MachineDetail() {
 
     return {
       time: formatTimestamp(tick.timestamp),
-      [trendConfig.label]: Number(getTrendValue(m)).toFixed(1),
+      [trendConfig.label]: Number(getTrendValue(m).toFixed(1)),
     };
   });
 
@@ -93,6 +93,7 @@ export default function MachineDetail() {
         <Link to="/" className="text-gray-400 hover:text-white text-xl">
           ←
         </Link>
+        /
         <h1 className="text-2xl font-bold">
           {id} {machine?.name}
         </h1>
