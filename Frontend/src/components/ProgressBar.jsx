@@ -11,7 +11,7 @@ export default function ProgressBar({ label, value, metric = "oee" }) {
     <div className="w-full">
       <div className="mb-1.5 flex items-baseline justify-between">
         <span className="hud-label">{label}</span>
-        <span className={`readout text-sm font-semibold ${textColor}`}>
+        <span className={`readout text-md font-semibold ${textColor}`}>
           {clamped.toFixed(1)}%
         </span>
       </div>

@@ -153,7 +153,9 @@ export default function MachineDetail() {
         <Panel
           title="OEE 추이"
           accent={oeeLevel}
-          right={`목표 ${(targets.oee * 100).toFixed(0)}%`}
+          goal={"목표"}
+          right={(targets.oee * 100).toFixed(0)}
+          unit={"%"}
         >
           <div className="h-150 w-full">
             <LineChart
@@ -187,7 +189,9 @@ export default function MachineDetail() {
         <Panel
           title="시간별 생산량"
           accent="accent"
-          right={`금일 목표 ${targetCount}ea`}
+          goal={"금일 목표"}
+          right={targetCount}
+          unit={"ea"}
         >
           <div className="h-150 w-full">
             <AreaChart
@@ -205,11 +209,12 @@ export default function MachineDetail() {
           accent={oeeLevel}
           right={
             <span
-              className={`readout text-lg font-bold ${LEVEL_TEXT[oeeLevel]}`}
+              className={`readout text-xl font-bold ${LEVEL_TEXT[oeeLevel]}`}
             >
-              {oeePercent.toFixed(1)}%
+              {oeePercent.toFixed(1)}
             </span>
           }
+          unit={<span className={`${LEVEL_TEXT[oeeLevel]}`}>%</span>}
           bodyClassName="flex flex-col gap-4"
         >
           <ProgressBar

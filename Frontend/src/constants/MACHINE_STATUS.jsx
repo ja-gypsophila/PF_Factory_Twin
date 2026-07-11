@@ -13,6 +13,13 @@ export const STATUS_COLOR = {
   REPAIR: "bg-accent/10 text-accent ring-1 ring-accent/30",
 };
 
+export const STATUS_CARD_COLOR = {
+  RUNNING: "text-ok",
+  IDLE: "text-warning",
+  DOWN: "text-danger",
+  REPAIR: "text-accent",
+};
+
 // LED 도트 (발광). 상태 표시등처럼 쓰고 싶을 때
 export const STATUS_DOT = {
   RUNNING: "bg-ok shadow-glow-ok",

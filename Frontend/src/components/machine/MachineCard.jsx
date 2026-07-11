@@ -1,27 +1,40 @@
 import { calculateOee } from "../../utils/calculateOee";
-import { STATUS_COLOR, STATUS_LABEL } from "../../constants/MACHINE_STATUS";
-import { getGrade } from "./../../utils/getGrade";
 import { Link } from "react-router-dom";
+import ProgressBar from "../ProgressBar";
+import StatusIcon from "../StatusIcon";
+import {
+  STATUS_CARD_COLOR,
+  STATUS_LABEL,
+} from "../../constants/MACHINE_STATUS";
 
 export default function MachineCard({ machine }) {
-  const oeePercent = calculateOee(machine.metrics).oee * 100;
+  const { availability, oee } = calculateOee(machine.metrics);
+  const oeePercent = oee * 100;
+  const availabilityPercent = availability * 100;
 
   return (
-    <Link to={`/machine/${machine.machineId}`}>
+    <Link className="w-full" to={`/machine/${machine.machineId}`}>
       <div
         key={machine.machineId}
-        className="flex flex-col items-center gap-1 border rounded-lg p-4"
+        className="w-full hover:bg-raised/60 flex flex-col gap-1 border rounded-lg p-16"
       >
-        <div className="font-bold">{machine.machineId}</div>
-        <span
-          className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLOR[machine.status]}`}
-        >
-          {STATUS_LABEL[machine.status]}
-        </span>
-        <div>
-          OEE: {oeePercent.toFixed(1)}% {getGrade(oeePercent)}
+        <div className="font-bold">
+          <div className="flex justify-between">
+            <span>{machine.machineId}</span>
+            <div className="flex">
+              <StatusIcon status={machine.status} />
+              <span
+                className={`text-sm px-10 py-2 rounded-full ${STATUS_CARD_COLOR[machine.status]}`}
+              >
+                {STATUS_LABEL[machine.status]}
+              </span>
+            </div>
+          </div>
+          <span>{machine.name}</span>
         </div>
-        <div>온도 : {machine.temperature}°C</div>
+
+        <ProgressBar label="가용성" value={availabilityPercent}></ProgressBar>
+        <ProgressBar label="OEE" value={oeePercent.toFixed(1)}></ProgressBar>
       </div>
     </Link>
   );

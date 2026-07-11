@@ -15,10 +15,12 @@ const STRIP = {
 export default function Panel({
   title,
   right,
+  goal,
   accent,
   className = "",
   bodyClassName = "",
   children,
+  unit,
 }) {
   return (
     <div className={`panel overflow-hidden ${className}`}>
@@ -32,7 +34,7 @@ export default function Panel({
       {/* 헤더 */}
       {(title || right) && (
         <div className="flex items-center justify-between gap-3 border-b border-hairline px-4 py-2.5">
-          <span className="hud-label flex items-center gap-2">
+          <span className="hud-label flex items-center gap-5">
             {accent && (
               <span
                 className={`inline-block h-1.5 w-1.5 rounded-full ${STRIP[accent] ?? STRIP.accent}`}
@@ -40,7 +42,15 @@ export default function Panel({
             )}
             {title}
           </span>
-          {right && <span className="readout text-xs text-muted">{right}</span>}
+          {right && (
+            <span className="text-md font-semibold text-white gap-6 flex">
+              <span>{goal}</span>
+              <span className="font-mono">
+                {right}
+                {unit}
+              </span>
+            </span>
+          )}
         </div>
       )}
 

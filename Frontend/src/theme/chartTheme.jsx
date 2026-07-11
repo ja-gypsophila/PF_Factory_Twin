@@ -8,7 +8,12 @@ export const GRID_STROKE = "#1a2430";
 export const AXIS_TICK = { fill: "#8a99ad", fontSize: 11 };
 export const AXIS_LINE = { stroke: "#1e2a38" };
 
-export const CURSOR = { stroke: "#38e0ff", strokeWidth: 1, strokeDasharray: "3 3" };
+export const CURSOR = {
+  stroke: "#38e0ff",
+  strokeWidth: 1,
+  strokeDasharray: "3 3",
+  fill: "rgba(56,224,255,0.1)",
+};
 
 export const TOOLTIP_CONTENT = {
   background: "rgba(13, 18, 25, 0.95)",

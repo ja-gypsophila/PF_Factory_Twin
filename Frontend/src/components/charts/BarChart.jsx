@@ -9,6 +9,7 @@ import {
   Bar,
 } from "recharts";
 import { formatCompact } from "../../utils/formatNumber";
+import { CURSOR, TOOLTIP_CONTENT, TOOLTIP_LABEL } from "../../theme/chartTheme";
 
 export default function BarChart({ data, xKey, series, yDomain, unit }) {
   return (
@@ -22,10 +23,14 @@ export default function BarChart({ data, xKey, series, yDomain, unit }) {
           domain={yDomain}
           unit={unit}
           tickFormatter={(v) => formatCompact(v)}
-          width={80}
         />{" "}
         {/* 세로축 */}
-        <Tooltip /> {/* 마우스 올리면 값 표시 */}
+        <Tooltip
+          cursor={CURSOR}
+          contentStyle={TOOLTIP_CONTENT}
+          labelStyle={TOOLTIP_LABEL}
+        />{" "}
+        {/* 마우스 올리면 값 표시 */}
         <Legend /> {/* 범례 */}
         {/* 실제 선: 어떤 필드를 그릴지 */}
         {series.map((s) => (

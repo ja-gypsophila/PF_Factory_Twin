@@ -48,19 +48,18 @@ export default function Dashboard() {
     <div className="flex flex-col justify-center gap-15">
       {/* Header */}
       <div className="border-b-gray-700 border-b-2">
-        <div className="flex justify-between">
-          <div className="flex p-14 gap-6">
-            <div>인천 1공장</div>
-            <div className="border-l-gray-700 border-2"></div>
-            <div className="">A라인 • 주간 1조</div>
+        <div className="flex justify-between items-center font-semibold">
+          <div className="flex divide-x-2 divide-white">
+            <div className="px-4">인천 1공장</div>
+            <div className="px-4">A라인 • 주간 1조</div>
           </div>
-          <div>
+          <div className="flex flex-col p-14 gap-6">
             <span>서버 상태 {status}</span>
             <span>현재 시각 {currentTime}</span>
           </div>
         </div>
       </div>
-      <div className="flex flex-col px-[8vw]">
+      <div className="flex flex-col px-[8vw] gap-12">
         <div className="flex justify-between gap-[2vw]">
           <KpiCard
             label={"OEE"}
@@ -96,21 +95,31 @@ export default function Dashboard() {
           />
         </div>
         <MachineList data={data} />
-        <div className="w-full h-300">
-          <LineChart
-            data={chartOEE}
-            xKey={"time"}
-            series={machinesOEE}
-            yDomain={[0, 100]}
-            unit={"%"}
-            refLine={stats?.targetOee}
-          />
-        </div>
+        <Panel
+          title={"공장 평균 OEE"}
+          accent={"accent"}
+          goal={"금일 목표"}
+          right={stats?.targetOee}
+          unit={"%"}
+        >
+          <div className="w-full h-300">
+            <LineChart
+              data={chartOEE}
+              xKey={"time"}
+              series={machinesOEE}
+              yDomain={[0, 100]}
+              unit={"%"}
+              refLine={stats?.targetOee}
+            />
+          </div>
+        </Panel>
 
         <Panel
           title={"시간대 생산량"}
           accent={"accent"}
-          right={`금일 목표 ${stats.targetCount}ea`}
+          goal={"금일 목표"}
+          right={stats?.targetCount}
+          unit={"ea"}
         >
           <div className="w-full h-300">
             <AreaChart
@@ -122,14 +131,11 @@ export default function Dashboard() {
           </div>
         </Panel>
 
-        <div className="w-full h-300">
-          <BarChart
-            data={dailyProdTrend}
-            xKey={"day"}
-            series={dailyProd}
-            unit={"ea"}
-          />
-        </div>
+        <Panel title={"일일 생산량"} accent={"accent"}>
+          <div className="w-full h-300">
+            <BarChart data={dailyProdTrend} xKey={"day"} series={dailyProd} />
+          </div>
+        </Panel>
       </div>
     </div>
   );
