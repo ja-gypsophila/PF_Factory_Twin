@@ -9,6 +9,7 @@ import { formatTimestamp } from "../utils/formatTimestamp";
 import BarChart from "../components/charts/BarChart";
 import AreaChart from "../components/charts/AreaChart";
 import Panel from "../components/Panel";
+import LoadingScreen from "../components/LoadingScreen";
 
 export default function Dashboard() {
   const { data, status, history } = useWebSocketContext();
@@ -43,6 +44,8 @@ export default function Dashboard() {
   ];
 
   const hourProd = [{ key: "생산량", color: "#3b82f6" }];
+
+  if (!stats) return <LoadingScreen message="집계 대기 중" />;
 
   return (
     <div className="flex flex-col justify-center gap-15">

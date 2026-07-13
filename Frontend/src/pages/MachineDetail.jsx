@@ -137,7 +137,7 @@ export default function MachineDetail() {
       </div>
 
       {/* ── 종류별 센서 리드아웃 ── */}
-      <div className="flex w-full gap-12  justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-12 justify-between">
         {sensorConfigs.map((s) => (
           <StatTile
             key={s.key}

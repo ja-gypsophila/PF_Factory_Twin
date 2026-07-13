@@ -20,7 +20,7 @@ export default function StatTile({ label, value, unit, tone }) {
         <span
           className={`readout text-50 font-semibold leading-none ${tone ? TONE[tone] : "text-ink"}`}
         >
-          {formatCompact(value) ?? "—"}
+          {formatCompact(value)}
         </span>
         {unit && <span className="text-15 text-faint">{unit}</span>}
       </div>
