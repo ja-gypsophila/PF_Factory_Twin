@@ -2,7 +2,7 @@ import { Link, useParams } from "react-router-dom";
 import { useWebSocketContext } from "../context/WebSocketProvider";
 import { calculateOee } from "../utils/calculateOee";
 import { formatTimestamp } from "../utils/formatTimestamp";
-import { STATUS_LABEL, STATUS_DOT } from "../constants/MACHINE_STATUS";
+import { STATUS_LABEL, STATUS_COLOR } from "../constants/MACHINE_STATUS";
 import LineChart from "../components/charts/LineChart";
 import { formatMinSec } from "../utils/formatMinSec";
 import ProgressBar from "../components/ProgressBar";
@@ -11,7 +11,12 @@ import Panel from "../components/Panel";
 import { getLevel, LEVEL_TEXT } from "../theme/levels";
 import AreaChart from "../components/charts/AreaChart";
 import { TYPE_SENSORS, TYPE_TRENDS } from "../constants/MACHINE_TYPE";
-import { AlertTriangleIcon, CheckCircle2, ArrowLeft } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CheckCircle2,
+  ArrowLeft,
+  Filter,
+} from "lucide-react";
 import { getMachineEvents } from "../constants/MACHINE_EVENTS";
 
 export default function MachineDetail() {
@@ -56,11 +61,6 @@ export default function MachineDetail() {
   const mtbf = hasEnoughData ? runTimeSec / downCount : null; // 시간단위
   const mttr = hasEnoughData ? downTimeSec / downCount : null;
 
-  // 병목 설비 기계인지 아닌지 확인 (고정: "INJECTION" 사출기)
-  const isBottleNeck = machine.isBottleneck;
-
-  console.log(isBottleNeck);
-
   // 이 설비의 OEE / 온도 추이 (history 기반) / 시간별 생산량
   const oeeTrend = history.map((tick) => {
     const m = tick.machines.find((item) => item.machineId === id);
@@ -95,31 +95,32 @@ export default function MachineDetail() {
   const oeeLevel = getLevel("oee", oeePercent); // ok | warn | danger
 
   return (
-    <div className="mx-auto flex  flex-col gap-5 px-[6vw] py-8">
+    <div className="mx-auto flex  flex-col gap-12 px-[6vw] py-8 text-lg">
       {/* ── 헤더 ── */}
-      <div className="flex flex-wrap items-center gap-4 border-b border-hairline pb-5">
+      <div className="flex flex-wrap items-center gap-12 border-b border-hairline pb-5">
         <Link
           to="/"
-          className="flex h-9 w-9 items-center justify-center rounded-md border border-hairline text-muted transition-colors hover:border-edge hover:text-ink"
+          className="flex h-30 w-30 items-center justify-center rounded-md border border-hairline text-muted transition-colors hover:border-edge hover:text-ink"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft size={20} />
         </Link>
 
+        {machine.isBottleneck && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-8 py-5 font-bold uppercase tracking-wider text-accent">
+            <Filter size={12} /> 병목 공정
+          </span>
+        )}
+
         <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-ink">
-            {machine.name}
-          </h1>
-          <span className="readout text-sm text-faint">{id}</span>
+          <h1 className="font-bold tracking-tight text-ink">{machine.name}</h1>
+          <span className="readout text-faint">{id}</span>
         </div>
 
         {/* LED 상태 뱃지 */}
-        <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-panel px-3 py-1">
-          <span
-            className={`inline-block h-2 w-2 rounded-full ${STATUS_DOT[machine.status]}`}
-          />
-          <span className="hud-label !tracking-[0.12em] text-ink">
-            {STATUS_LABEL[machine.status]}
-          </span>
+        <span
+          className={`text-sm px-10 py-2 rounded-full ${STATUS_COLOR[machine.status]}`}
+        >
+          {STATUS_LABEL[machine.status]}
         </span>
 
         {trendConfig && (
@@ -136,7 +137,7 @@ export default function MachineDetail() {
       </div>
 
       {/* ── 종류별 센서 리드아웃 ── */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="flex w-full gap-12  justify-between">
         {sensorConfigs.map((s) => (
           <StatTile
             key={s.key}
@@ -148,7 +149,7 @@ export default function MachineDetail() {
       </div>
 
       {/* ── 차트/지표 그리드 ── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-12 lg:grid-cols-2 ">
         {/* OEE 추이 */}
         <Panel
           title="OEE 추이"

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export function useWebSocket(url) {
+export function useWebSocket(url, maxRetries = 10) {
   const [data, setData] = useState(null); // 가장 최근에 받은 데이터
   const [status, setStatus] = useState("연결 중"); // WebSocket 연결 상태
   const [history, setHistory] = useState([]); // 받은 데이터를 쌓는 이력 배열
@@ -9,24 +9,46 @@ export function useWebSocket(url) {
   useEffect(() => {
     let isUnmounted = false;
     let reconnectTimer = null;
-
+    let retryCounter = 0;
     const connect = () => {
       const socket = new WebSocket(url);
       socketRef.current = socket;
 
-      socket.onopen = () => setStatus("연결됨");
-      socket.onclose = () => {
-        setStatus("연결 끊김");
-        if (!isUnmounted) {
-          setStatus("재연결 시도 중");
-          reconnectTimer = setTimeout(connect, 3000); // 3초 후 재연결 시도
-        }
+      socket.onopen = () => {
+        setStatus("연결됨");
+        retryCounter = 0;
       };
-      socket.onerror = (error) => setStatus(`에러: ${error.message}`);
+      socket.onclose = () => {
+        if (isUnmounted) return;
+
+        // ① 재시도 횟수 초과 → 중단 + 안내 (return 필수!)
+        if (retryCounter >= maxRetries) {
+          setStatus("네트워크를 확인해주세요");
+          return;
+        }
+
+        // ② "연결 끊김"은 첫 끊김에만 (재시도 루프 중엔 안 깜빡이게)
+        if (retryCounter === 0) setStatus("연결 끊김");
+
+        retryCounter += 1;
+        reconnectTimer = setTimeout(() => {
+          if (isUnmounted) return;
+          setStatus(`재연결 시도 중 (${retryCounter}/${maxRetries})`);
+          reconnectTimer = setTimeout(connect, 300);
+        }, 1000);
+      };
+
+      socket.onerror = () => {
+        console.warn("WebSocket 오류 발생");
+      };
       socket.onmessage = (e) => {
-        const newData = JSON.parse(e.data);
-        setData(newData);
-        setHistory((prevHistory) => [...prevHistory, newData].slice(-50)); // 새로운 데이터를 이력에 추가
+        try {
+          const newData = JSON.parse(e.data);
+          setData(newData);
+          setHistory((prev) => [...prev, newData].slice(-50));
+        } catch (err) {
+          console.warn("잘못된 메시지 무시:", err); // 앱은 계속 동작
+        }
       };
     };
 
@@ -38,7 +60,7 @@ export function useWebSocket(url) {
       clearTimeout(reconnectTimer);
       socketRef.current?.close();
     };
-  }, [url]);
+  }, [url, maxRetries]);
 
   return { data, status, history };
 }

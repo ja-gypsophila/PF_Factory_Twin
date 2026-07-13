@@ -16,7 +16,7 @@ export default function MachineCard({ machine }) {
     <Link className="w-full" to={`/machine/${machine.machineId}`}>
       <div
         key={machine.machineId}
-        className="w-full hover:bg-raised/60 flex flex-col gap-1 border rounded-lg p-16"
+        className="w-full  hover:bg-black/50  flex flex-col gap-1 border rounded-lg p-16"
       >
         <div className="font-bold">
           <div className="flex justify-between">

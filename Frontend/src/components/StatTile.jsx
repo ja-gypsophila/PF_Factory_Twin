@@ -14,15 +14,15 @@ const TONE = {
 
 export default function StatTile({ label, value, unit, tone }) {
   return (
-    <div className="panel group px-4 py-3.5 transition-colors hover:bg-raised/60">
+    <div className="w-full panel group px-15 py-10 transition-colors hover:bg-raised/60">
       <div className="hud-label">{label}</div>
       <div className="mt-1.5 flex items-baseline gap-1">
         <span
-          className={`readout text-25 font-semibold leading-none ${tone ? TONE[tone] : "text-ink"}`}
+          className={`readout text-50 font-semibold leading-none ${tone ? TONE[tone] : "text-ink"}`}
         >
           {formatCompact(value) ?? "—"}
         </span>
-        {unit && <span className="text-xs text-faint">{unit}</span>}
+        {unit && <span className="text-15 text-faint">{unit}</span>}
       </div>
     </div>
   );

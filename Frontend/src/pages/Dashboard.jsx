@@ -60,7 +60,7 @@ export default function Dashboard() {
         </div>
       </div>
       <div className="flex flex-col px-[8vw] gap-12">
-        <div className="flex justify-between gap-[2vw]">
+        <div className="grid grid-cols-2 md:grid-cols-4  justify-between gap-[2vw]">
           <KpiCard
             label={"OEE"}
             current={stats?.avgOee}

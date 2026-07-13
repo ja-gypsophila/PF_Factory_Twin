@@ -34,7 +34,7 @@ export default {
         // ── 텍스트 계층 ──
         ink: "#e8eef5",        // 주 텍스트
         muted: "#8a99ad",      // 보조
-        faint: "#556173",      // 흐린 라벨
+        faint: "#8B9CB4",      // 흐린 라벨
       },
       boxShadow: {
         // 상태 발광 (LED 느낌)
