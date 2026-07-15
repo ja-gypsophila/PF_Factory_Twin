@@ -19,20 +19,20 @@ export default function KpiCard({
       <div className="hud-label">{label}</div>
 
       <div className="mt-1.5 flex items-baseline gap-1">
-        <span className="readout text-50 font-semibold leading-none text-ink">
+        <span className="readout text-25 sm:text-35 lg:text-50 font-semibold leading-none text-ink">
           {Number(current).toFixed(dec)}
         </span>
         {unit && <span className="text-xl text-faint">{unit}</span>}
       </div>
 
-      <div className="mt-2 flex items-center justify-between">
-        <span className="text-xl text-faint">
+      <div className="mt-2 flex flex-wrap items-center justify-between">
+        <span className="text-sm sm:text-lg lg:text-xl text-faint">
           <span className="font-sans">목표</span>{" "}
           <span className="readout">{Number(target).toFixed(dec)}</span>
           {unit}
         </span>
         <span
-          className={`readout flex items-center gap-0.5 text-xl font-semibold ${gapColor}`}
+          className={`readout flex items-center gap-0.5 text-ms sm:text-lg lg:text-xl font-semibold ${gapColor}`}
         >
           <Arrow size={13} strokeWidth={2.5} />
           {Math.abs(calcGap)}

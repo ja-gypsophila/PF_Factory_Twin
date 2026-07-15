@@ -6,7 +6,7 @@ const { WebSocketServer } = require('ws');
 
 const TICK_INTERVAL_MS = 1000;                 // 몇 ms마다 갱신할지 (3초 = 1틱)
 const TICK_INTERVAL_SEC = TICK_INTERVAL_MS / 1000; // 초 단위(3) — 시간 누적 계산에 사용
-const PORT = 8080;                             // WebSocket 서버 포트
+const PORT = process.env.PORT || 8080;         // 배포 호스트(Render 등)가 주입하는 PORT 우선, 로컬은 8080
 
 // 만들 설비 목록 
 const MACHINE_SPECS = [
@@ -97,8 +97,24 @@ function randomFloat(min, max) {
 // 3. WebSocket 서버 + 전송
 // ────────────────────────────────────────────────────────────
 
-const wss = new WebSocketServer({ port: PORT });
-console.log(`서버 실행중: ws://localhost:${wss.address().port}`);
+// HTTP 서버에 WebSocket을 얹는다.
+// - 배포 호스트(Render)의 포트 감지 / 헬스체크에 응답
+// - keep-alive 핑용 /health 엔드포인트 제공 (무료 티어 잠들기 방지)
+const http = require('http');
+const httpServer = http.createServer((req, res) => {
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('ok');
+        return;
+    }
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Factory Twin WebSocket server');
+});
+
+const wss = new WebSocketServer({ server: httpServer });
+httpServer.listen(PORT, () => {
+    console.log(`서버 실행중: 포트 ${PORT}`);
+});
 
 // 접속 중인 모든 클라이언트(브라우저)에게 같은 데이터를 뿌린다.
 function broadcast(data) {

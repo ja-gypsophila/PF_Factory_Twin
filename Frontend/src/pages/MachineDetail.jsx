@@ -95,7 +95,7 @@ export default function MachineDetail() {
   const oeeLevel = getLevel("oee", oeePercent); // ok | warn | danger
 
   return (
-    <div className="mx-auto flex  flex-col gap-12 px-[6vw] py-8 text-lg">
+    <div className="mx-auto flex  flex-col gap-12 px-[6vw] py-8 text-sm md:text-lg">
       {/* ── 헤더 ── */}
       <div className="flex flex-wrap items-center gap-12 border-b border-hairline pb-5">
         <Link
@@ -106,12 +106,12 @@ export default function MachineDetail() {
         </Link>
 
         {machine.isBottleneck && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-8 py-5 font-bold uppercase tracking-wider text-accent">
-            <Filter size={12} /> 병목 공정
+          <span className="inline-flex items-center gap-1 rounded-full border border-accent/40 bg-accent/10 px-8 py-3 font-bold uppercase tracking-wider text-accent">
+            <Filter size={16} /> 병목 공정
           </span>
         )}
 
-        <div className="flex items-baseline gap-3">
+        <div className="flex gap-10">
           <h1 className="font-bold tracking-tight text-ink">{machine.name}</h1>
           <span className="readout text-faint">{id}</span>
         </div>

@@ -4,7 +4,9 @@ import { useWebSocket } from "../hook/useWebSocket";
 const WebSocketContext = createContext(null);
 
 export function WebSocketProvider({ children }) {
-  const value = useWebSocket("ws://localhost:8080");
+  // 배포 시엔 Vercel 환경변수 VITE_WS_URL(wss://...)을 사용, 로컬은 기본값
+  const wsUrl = import.meta.env.VITE_WS_URL ?? "ws://localhost:8080";
+  const value = useWebSocket(wsUrl);
   return (
     <WebSocketContext.Provider value={value}>
       {children}
