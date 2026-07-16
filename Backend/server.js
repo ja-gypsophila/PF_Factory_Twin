@@ -87,11 +87,15 @@ function randomFloat(min, max) {
     return min + Math.random() * (max - min);
 }
 
+// KST 변환용 포맷터 — 반드시 "한 번만" 만들어 재사용한다.
+// (Intl.DateTimeFormat은 ICU 데이터를 지닌 무거운 객체라, 매 호출마다 생성하면
+//  GC가 못 따라가 메모리가 계속 불어난다 → Render 512MB OOM 원인이었음)
+const KST_HOUR_FMT = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "numeric", hour12: false });
+const KST_DATE_FMT = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Seoul" }); // en-CA → "YYYY-MM-DD"
+
 // 서울(KST) 기준 현재 "시" (0~23). Render는 UTC로 돌기 때문에 반드시 KST로 변환해서 판정한다.
 function seoulHour(d = new Date()) {
-    return Number(
-        new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "numeric", hour12: false }).format(d)
-    );
+    return Number(KST_HOUR_FMT.format(d));
 }
 
 // 지금이 조업 시간(08:00~19:59 KST)인지
@@ -127,9 +131,13 @@ httpServer.listen(PORT, () => {
 function broadcast(data) {
     const message = JSON.stringify(data); // 전송은 문자열로만 가능 → 객체를 문자열로
     wss.clients.forEach((client) => {
-        if (client.readyState === client.OPEN) { // 연결이 살아있는 클라이언트에게만
-            client.send(message);
-        }
+        if (client.readyState !== client.OPEN) return; // 연결이 살아있는 클라이언트에게만
+
+        // 백프레셔 가드: 상대가 안 읽어서 전송 버퍼가 1MB 이상 밀려 있으면
+        // 이번 틱은 건너뛴다 (죽은 연결에 계속 쌓이면 메모리 누수가 됨)
+        if (client.bufferedAmount > 1_000_000) return;
+
+        client.send(message);
     });
 }
 
@@ -300,7 +308,7 @@ const dailyProduction = Array.from({ length: 7 }, (_, i) => {
 });
 
 // ────────────────────────────────────────────────────────────
-// 시간대 생산량: 실집계 → 차트 시리즈 변환 + 지나간 시간대 백필
+// 시간대 생산량: 실집계 → 차트 시리즈 변환 + 지나간 시간대 채움
 // ────────────────────────────────────────────────────────────
 
 // 설비의 시간대별 실집계(hourlyCounts)를 프론트 차트 형태로 변환한다.
@@ -318,7 +326,7 @@ function buildHourSeries(machine) {
     return series;
 }
 
-// [백필] 지나간 1시간치를 시뮬레이션 수치로 채운다 (서버 재시작·조업 중간 기동 대비).
+// [지난 시간대 채움] 지나간 1시간치를 시뮬레이션 수치로 채운다 (서버 재시작·조업 중간 기동 대비).
 // 실제 tick 생산과 같은 공식(가동률×성능/사이클타임)을 쓰므로 실집계와 규모가 이어진다.
 function backfillHour(machine, hourKey) {
     const planned = 3600;                                   // 그 시간대 계획시간
@@ -346,8 +354,8 @@ function backfillHour(machine, hourKey) {
     }
 }
 
-// [백필] 오늘 조업 시간 중 "이미 지나간" 시간대 전체를 채운다.
-// (예: 15시에 서버가 켜지면 8~14시를 백필하고, 15시부터는 실집계)
+// [지난 시간대 채움] 오늘 조업 시간 중 "이미 지나간" 시간대 전체를 채운다.
+// (예: 15시에 서버가 켜지면 8~14시를 채우고, 15시부터는 실집계)
 // machines 배열은 공정 순서(LINE_ORDER)와 같아서, 같은 시간대 안에서
 // 앞 공정이 먼저 채워진 뒤 뒤 공정이 그만큼만 처리한다.
 function backfillPastHours() {
@@ -392,8 +400,9 @@ function serializeMachine(machine) {
 // ────────────────────────────────────────────────────────────
 
 // 서울 기준 날짜 문자열 "YYYY-MM-DD" (Render는 UTC로 돌기 때문에 KST로 계산해야 진짜 자정에 리셋됨)
+// 캐싱해둔 KST_DATE_FMT 재사용 (매 호출 생성 금지 — 상단 주석 참고)
 function seoulDateStr(d = new Date()) {
-    return d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+    return KST_DATE_FMT.format(d);
 }
 
 // 어제치 총계를 7일 이력(dailyProduction)에 반영하고, 가장 오래된 날 제거
@@ -430,7 +439,7 @@ const inspectionMachine = machines.find((m) => m.type === "INSPECTION");
 
 setInterval(() => {
     // ⓪ 날짜가 바뀌었으면 어제치를 이력에 넣고 금일 지표 리셋
-    //    (틱마다 비교하므로, 자정에 서버가 잠들어 있었어도 깨어난 직후 따라잡아 리셋+백필)
+    //    (틱마다 비교하므로, 자정에 서버가 잠들어 있었어도 깨어난 직후 따라잡아 리셋 후 지나간 시간대를 채움)
     const today = seoulDateStr();
     if (today !== currentDay) {
         rolloverDaily(currentDay);
