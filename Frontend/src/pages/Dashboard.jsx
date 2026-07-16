@@ -121,7 +121,7 @@ export default function Dashboard() {
           title={"시간대 생산량"}
           accent={"accent"}
           goal={"금일 목표"}
-          right={stats?.targetCount}
+          right={stats?.lineDailyTarget}
           unit={"ea"}
         >
           <div className="w-full h-300">

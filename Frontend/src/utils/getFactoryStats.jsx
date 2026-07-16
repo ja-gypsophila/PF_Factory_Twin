@@ -23,7 +23,10 @@ export default function getFactoryStats(machines) {
       acc.oeeTargetSum += targets.oee; // 각 기계 목표 OEE(0~1)를 더함(→평균낼 것)
 
       // ── 목표 생산량 = 설비별 고정 목표(dailyCount)의 합 ──
-      acc.targetCount = targets.dailyCount; // 서버가 관리하는 고정값 (매 틱 안 변함)
+      acc.targetCount += targets.dailyCount; // 서버가 관리하는 고정값 (매 틱 안 변함)
+
+      // 라인 목표(설비 1대 기준) — "시간대 생산량"(라인 최종 산출) 차트의 목표선용
+      acc.lineDailyTarget = targets.dailyCount;
 
       // ── 설비 대수 카운트 ──
       if (status === "RUNNING")
@@ -62,6 +65,7 @@ export default function getFactoryStats(machines) {
 
     totalCount: acc.totalCount, // 개수는 그대로
     targetCount: acc.targetCount,
+    lineDailyTarget: acc.lineDailyTarget, // 라인 최종 산출 목표 (시간대 생산량 차트용)
 
     defectRate:
       acc.totalCount > 0 ? (acc.defectCount / acc.totalCount) * 100 : 0, // 1.0

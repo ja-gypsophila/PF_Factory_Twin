@@ -30,8 +30,7 @@ const SIM = {
     idleHoldTicks: [2, 5],
     runHoldTicks: [5, 15],
 
-    // 생산 관련
-    cycleTimeSecRange: [2, 4],     // 이상적으로 1개 만드는 시간(초). 기계마다 고정
+    // 생산 관련 (사이클타임은 설비 종류별 TYPE_CYCLE_SEC에서 관리)
     performanceRange: [0.75, 1.0], // 성능 계수: 이상 속도의 75~100% (평균 ~87%, 변동 폭 넓힘)
     defectRate: 0.02,              // 불량률 10% (품질 ~90%, 목표에 붙임)
 
@@ -51,32 +50,27 @@ const DEFAULT_TARGETS = {
     quality: 0.98,       // 목표 품질 (실측 평균 ~0.98)
     tempWarning: 38,     // 온도 경고 임계치 (°C)
     tempCritical: 43,    // 온도 위험 임계치 (°C) — 상한 45 미만이라 도달 가능
-    dailyCount: 5000,    // 설비당 하루 목표 생산량 (고정값, 매 틱 재계산 X)
+    dailyCount: 5000,    // 설비당 하루 목표 생산량 (조업 12h 기준. 병목 사출기·하류 검사기는 미달, 상류는 달성)
 };
 
 // ────────────────────────────────────────────────────────────
-// 순차 라인 구성 (고정 병목)
-//   프레스 → 용접 → 사출 → 검사  (앞 공정이 만든 만큼만 뒤 공정이 처리)
-//   라인 속도는 "가장 느린 설비(병목)"가 결정하고,
-//   각 공정을 통과할 때마다 수율만큼 양품이 줄어든다.
+// 조업 시간 + 라인 구성 (고정 병목)
+//   조업: KST 08:00~19:59 (8시~19시, 12개 시간대 버킷)
+//   그 외 시간은 설비 정지(IDLE) — 지표를 수집하지 않는다.
+//   병목: 사출기의 사이클타임이 가장 길어 시간당 산출이 가장 낮다.
 // ────────────────────────────────────────────────────────────
-const LINE_ORDER = ["PRESS", "WELDER", "INJECTION", "INSPECTION"]; // 공정 순서
-const BOTTLENECK_TYPE = "INJECTION"; // 사출기 = 고정 병목 (시간당 능력 최저)
+const OPERATING_HOURS = { start: 8, end: 19 }; // 19시 버킷(19:00~19:59)까지 수집
+const LINE_ORDER = ["PRESS", "WELDER", "INJECTION", "INSPECTION"]; // 공정 순서 (앞 공정이 만든 만큼만 뒤 공정이 처리)
+const BOTTLENECK_TYPE = "INJECTION"; // 사출기 = 고정 병목 (시간당 산출 최저)
 
-// 설비별 시간당 처리 능력 (병목이 가장 낮음)
-const HOURLY_CAPACITY = {
-    PRESS: [560, 640],
-    WELDER: [540, 620],
-    INJECTION: [400, 460], // ← 병목 (최저) → 라인 속도를 결정
-    INSPECTION: [520, 600],
-};
-
-// 공정별 수율 (통과하며 불량 제거 → 뒤로 갈수록 양품 감소)
-const STAGE_YIELD = {
-    PRESS: 1.0,
-    WELDER: 0.99,
-    INJECTION: 0.98,
-    INSPECTION: 0.97,
+// 설비 종류별 이상 사이클타임(초/개) — 사출기가 확실히 느려 병목이 된다.
+// 시간당 산출 ≈ 3600 × 가동률(~0.86) × 성능(~0.87) / 사이클타임
+//   → 프레스 ~480, 용접 ~465, 사출 ~375(병목), 검사 ~450이지만 재공품 부족으로 사출 수준에 묶임
+const TYPE_CYCLE_SEC = {
+    PRESS: [5.4, 5.9],
+    WELDER: [5.6, 6.1],
+    INJECTION: [6.9, 7.5],   // ← 병목 (최저 산출, 다른 설비와 겹치지 않게 확실히 느림)
+    INSPECTION: [5.8, 6.3],
 };
 
 // ────────────────────────────────────────────────────────────
@@ -91,6 +85,19 @@ function randomInt(min, max) {
 // min~max 사이 "실수" 랜덤
 function randomFloat(min, max) {
     return min + Math.random() * (max - min);
+}
+
+// 서울(KST) 기준 현재 "시" (0~23). Render는 UTC로 돌기 때문에 반드시 KST로 변환해서 판정한다.
+function seoulHour(d = new Date()) {
+    return Number(
+        new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Seoul", hour: "numeric", hour12: false }).format(d)
+    );
+}
+
+// 지금이 조업 시간(08:00~19:59 KST)인지
+function isOperatingHours() {
+    const h = seoulHour();
+    return h >= OPERATING_HOURS.start && h <= OPERATING_HOURS.end;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -141,8 +148,9 @@ function createMachine({ machineId, name, type }) {
         status: 'RUNNING',                // 시작은 가동 중
         // hourProduction / isBottleneck 은 라인 생성 후 아래에서 주입
         statusHoldTicksLeft: randomInt(...SIM.runHoldTicks), // 현재 상태를 몇 틱 더 유지할지
-        idealCycleTimeSec: randomFloat(...SIM.cycleTimeSecRange), // 이상 사이클타임(고정)
+        idealCycleTimeSec: randomFloat(...TYPE_CYCLE_SEC[type]), // 이상 사이클타임(종류별, 사출기=병목)
         unitProgress: 0,                  // 다음 1개 완성까지 진행률(0~1 누적)
+        hourlyCounts: {},                 // 시간대별 실제 생산 실집계 { "8시": 132, "9시": 385, ... }
         plannedTimeSec: 0,                // 켜져 있던 총 시간
         runTimeSec: 0,                    // 실제 가동(RUNNING) 시간
         downCount: 0,                     // 고장 횟수
@@ -169,13 +177,20 @@ function makeTypeSensors(type) {
 // const machines = MACHINE_IDS.map(createMachine);
 
 const machines = MACHINE_SPECS.map(createMachine)
-
-// 라인 시간별 생산량을 한 번 생성해서 각 설비에 분배 (설비 간 정합 보장)
-const { perType: lineByType, lineSeries: lineHourProduction } = makeLineHourProduction();
 machines.forEach((m) => {
-    m.hourProduction = lineByType[m.type] ?? []; // 이 설비의 시간별 생산량
     m.isBottleneck = m.type === BOTTLENECK_TYPE;  // 병목 설비 여부
+
+    // 라인 결합: 바로 앞 공정 설비 참조 (첫 공정 프레스는 null)
+    // 뒤 공정은 앞 공정이 만든 것(재공품)보다 많이 생산할 수 없다 → 병목이 라인 전체를 지배
+    const order = LINE_ORDER.indexOf(m.type);
+    m.upstream = order > 0
+        ? machines.find((x) => x.type === LINE_ORDER[order - 1]) ?? null
+        : null;
 });
+
+// 서버가 조업 중간에 시작해도(재배포·재시작) 이미 지나간 시간대를 시뮬레이션으로 채워
+// 차트·금일 지표가 비어 보이지 않게 한다. 현재 시간부터는 실제 생산을 집계한다. (하이브리드)
+backfillPastHours();
 
 
 // ────────────────────────────────────────────────────────────
@@ -229,9 +244,17 @@ function produce(machine) {
     machine.unitProgress += TICK_INTERVAL_SEC / actualCycleTimeSec;
 
     // 진행률이 1을 넘을 때마다 제품 1개 완성 (한 틱에 여러 개 나올 수 있어 while)
+    const hourKey = `${seoulHour()}시`; // 완성 시각이 속한 시간대 버킷
     while (machine.unitProgress >= 1) {
+        // 라인 결합: 앞 공정이 만든 것(재공품)이 없으면 완성 불가 → 대기
+        // (진행률은 1로 눌러둬서, 재공품이 생기는 순간 몰아서 터지지 않게 함)
+        if (machine.upstream && machine.totalCount >= machine.upstream.totalCount) {
+            machine.unitProgress = 1;
+            break;
+        }
         machine.unitProgress -= 1; // 나머지는 다음 제품으로 이월
         machine.totalCount += 1;
+        machine.hourlyCounts[hourKey] = (machine.hourlyCounts[hourKey] ?? 0) + 1; // 시간대별 실집계
         if (Math.random() < SIM.defectRate) {
             machine.defectCount += 1; // 불량
         } else {
@@ -271,45 +294,67 @@ const dailyProduction = Array.from({ length: 7 }, (_, i) => {
     date.setDate(date.getDate() - (6 - i)); // 6일 전 ~ 오늘
     return {
         date: date.toISOString().slice(0, 10),        // "2026-07-05"
-        total: randomInt(11000, 14000),               // 그날 총 생산
-        defect: randomInt(150, 400),                  // 그날 불량
+        total: randomInt(19000, 23000),               // 그날 총 생산 (4대 합, 실집계 규모와 정렬)
+        defect: randomInt(380, 460),                  // 그날 불량 (~2%)
     };
 });
 
-// 순차 라인의 시간별 생산량을 "한 번에" 생성 (설비 간 정합 보장)
-//  - 매 시간 라인 처리량 = 병목(사출기) 능력이 결정
-//  - 앞 공정부터 순서대로 수율을 적용 → 뒤로 갈수록 양품 감소
-//  - 각 값은 누적(우상향)
-// 반환: { perType: { PRESS:[{hour,prod}], ... }, lineSeries:[{hour,prod}] }
-function makeLineHourProduction() {
-    const cum = {};        // 공정별 누적
-    const perType = {};    // 공정별 시간 시리즈
-    LINE_ORDER.forEach((t) => {
-        cum[t] = 0;
-        perType[t] = [];
-    });
+// ────────────────────────────────────────────────────────────
+// 시간대 생산량: 실집계 → 차트 시리즈 변환 + 지나간 시간대 백필
+// ────────────────────────────────────────────────────────────
 
-    let lineCum = 0;
-    const lineSeries = []; // 라인 최종 산출(=검사 통과) 누적
-
-    for (let i = 0; i < 12; i++) {
-        const hour = `${i + 8}시`; // 8시~19시
-
-        // 그 시간대 라인 흐름량 = 병목 설비가 정한 처리량
-        let flow = randomInt(...HOURLY_CAPACITY[BOTTLENECK_TYPE]);
-
-        // 앞 공정 → 뒤 공정 순서로 수율 적용 (통과할 때마다 양품 감소)
-        for (const type of LINE_ORDER) {
-            flow = Math.round(flow * STAGE_YIELD[type]);
-            cum[type] += flow;
-            perType[type].push({ hour, prod: cum[type] });
-        }
-
-        lineCum += flow; // 마지막 flow = 검사 통과량 = 라인 산출
-        lineSeries.push({ hour, prod: lineCum });
+// 설비의 시간대별 실집계(hourlyCounts)를 프론트 차트 형태로 변환한다.
+// 조업 시작(8시)부터 "현재 시각"까지만 누적(우상향) 시리즈로 만든다.
+// 반환: [{ hour: "8시", prod: 132 }, { hour: "9시", prod: 517 }, ...]
+function buildHourSeries(machine) {
+    const nowHour = seoulHour();
+    const series = [];
+    let cum = 0;
+    for (let h = OPERATING_HOURS.start; h <= OPERATING_HOURS.end; h++) {
+        if (h > nowHour) break; // 아직 오지 않은 시간대는 차트에 넣지 않음
+        cum += machine.hourlyCounts[`${h}시`] ?? 0;
+        series.push({ hour: `${h}시`, prod: cum });
     }
+    return series;
+}
 
-    return { perType, lineSeries };
+// [백필] 지나간 1시간치를 시뮬레이션 수치로 채운다 (서버 재시작·조업 중간 기동 대비).
+// 실제 tick 생산과 같은 공식(가동률×성능/사이클타임)을 쓰므로 실집계와 규모가 이어진다.
+function backfillHour(machine, hourKey) {
+    const planned = 3600;                                   // 그 시간대 계획시간
+    const run = Math.round(3600 * randomFloat(0.80, 0.92)); // 실가동 시간 (가동률 ~86%)
+    const perf = randomFloat(...SIM.performanceRange);      // 성능 계수
+    let count = Math.floor((run * perf) / machine.idealCycleTimeSec); // 생산 개수
+
+    // 라인 결합: 앞 공정 누적 산출을 넘을 수 없음 (실시간 produce와 같은 규칙)
+    if (machine.upstream) {
+        count = Math.max(0, Math.min(count, machine.upstream.totalCount - machine.totalCount));
+    }
+    const defects = Math.round(count * SIM.defectRate);
+
+    machine.plannedTimeSec += planned;
+    machine.runTimeSec += run;
+    machine.totalCount += count;
+    machine.defectCount += defects;
+    machine.goodCount += count - defects;
+    machine.hourlyCounts[hourKey] = (machine.hourlyCounts[hourKey] ?? 0) + count;
+
+    // 시간당 절반 확률로 고장 1회 (MTBF/MTTR 산출용. 다운타임은 비가동 시간 안에서만)
+    if (Math.random() < 0.5) {
+        machine.downCount += 1;
+        machine.downTimeSec += Math.min(randomInt(120, 420), planned - run);
+    }
+}
+
+// [백필] 오늘 조업 시간 중 "이미 지나간" 시간대 전체를 채운다.
+// (예: 15시에 서버가 켜지면 8~14시를 백필하고, 15시부터는 실집계)
+// machines 배열은 공정 순서(LINE_ORDER)와 같아서, 같은 시간대 안에서
+// 앞 공정이 먼저 채워진 뒤 뒤 공정이 그만큼만 처리한다.
+function backfillPastHours() {
+    const nowHour = seoulHour();
+    for (let h = OPERATING_HOURS.start; h <= OPERATING_HOURS.end && h < nowHour; h++) {
+        machines.forEach((m) => backfillHour(m, `${h}시`));
+    }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -326,7 +371,7 @@ function serializeMachine(machine) {
         isBottleneck: machine.isBottleneck, // 병목 설비 여부
         sensor: machine.sensor,
         targets: machine.targets,
-        hourProduction: machine.hourProduction,
+        hourProduction: buildHourSeries(machine), // 시간대별 "실제" 생산 누적 (8시~현재)
         status: machine.status,
         temperature: Number(machine.temperature.toFixed(2)), // 숫자로 통일 (소수 2자리)
         metrics: {
@@ -343,22 +388,79 @@ function serializeMachine(machine) {
 }
 
 // ────────────────────────────────────────────────────────────
-// 7. 메인 루프 (매 틱: 전체 진행 → 전송)
+// 7. 금일 데이터 일일 리셋 (자정, 한국시간 기준)
 // ────────────────────────────────────────────────────────────
 
-setInterval(() => {
-    machines.forEach(tick); // ① 4대 전부 3초치 진행
+// 서울 기준 날짜 문자열 "YYYY-MM-DD" (Render는 UTC로 돌기 때문에 KST로 계산해야 진짜 자정에 리셋됨)
+function seoulDateStr(d = new Date()) {
+    return d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
+}
 
-    broadcast({             // ② 결과를 모든 클라이언트에 전송
+// 어제치 총계를 7일 이력(dailyProduction)에 반영하고, 가장 오래된 날 제거
+function rolloverDaily(dayStr) {
+    const total = machines.reduce((s, m) => s + m.totalCount, 0);
+    const defect = machines.reduce((s, m) => s + m.defectCount, 0);
+    dailyProduction.push({ date: dayStr, total, defect });
+    if (dailyProduction.length > 7) dailyProduction.shift();
+}
+
+// 금일 누적 지표 초기화 (생산량·가동시간·고장 등 하루 단위 값)
+function resetDaily() {
+    machines.forEach((m) => {
+        m.plannedTimeSec = 0;
+        m.runTimeSec = 0;
+        m.downCount = 0;
+        m.downTimeSec = 0;
+        m.totalCount = 0;
+        m.goodCount = 0;
+        m.defectCount = 0;
+        m.unitProgress = 0;
+        m.hourlyCounts = {};   // 시간대 실집계도 새 날로
+    });
+}
+
+// ────────────────────────────────────────────────────────────
+// 8. 메인 루프 (매 틱: 날짜 확인 → 전체 진행 → 전송)
+// ────────────────────────────────────────────────────────────
+
+let currentDay = seoulDateStr(); // 마지막으로 확인한 "오늘"
+
+// 라인 최종 산출 = 마지막 공정(검사기)의 산출 → 대시보드 "시간대 생산량"에 사용
+const inspectionMachine = machines.find((m) => m.type === "INSPECTION");
+
+setInterval(() => {
+    // ⓪ 날짜가 바뀌었으면 어제치를 이력에 넣고 금일 지표 리셋
+    //    (틱마다 비교하므로, 자정에 서버가 잠들어 있었어도 깨어난 직후 따라잡아 리셋+백필)
+    const today = seoulDateStr();
+    if (today !== currentDay) {
+        rolloverDaily(currentDay);
+        resetDaily();
+        backfillPastHours(); // 며칠 잠들었다 낮에 깨어난 경우: 오늘 지나간 시간대 채움
+        currentDay = today;
+        console.log(`날짜 변경 → ${today}, 금일 데이터 리셋`);
+    }
+
+    // ① 조업 시간(08~19시 KST)에만 생산·지표 누적. 그 외엔 설비 정지(IDLE)로 동결
+    if (isOperatingHours()) {
+        machines.forEach(tick); // 4대 전부 1초치 진행
+    } else {
+        machines.forEach((m) => {
+            m.status = "IDLE";                       // 조업 종료 = 대기
+            updateTemperature(m);                    // 온도만 자연 냉각
+            m.sensor = makeTypeSensors(m.type);      // 센서 표시값 갱신
+        });
+    }
+
+    broadcast({             // ② 결과를 모든 클라이언트에 전송 (24시간 계속)
         timestamp: new Date().toISOString(),
         machines: machines.map(serializeMachine),
         dailyProduction,
-        lineHourProduction, // 라인 전체 시간별 산출(=검사 통과) — 대시보드용
+        lineHourProduction: buildHourSeries(inspectionMachine), // 라인 최종 산출(검사기) 실집계
     });
 }, TICK_INTERVAL_MS);
 
 // ────────────────────────────────────────────────────────────
-// 8. 접속 로그
+// 9. 접속 로그
 // ────────────────────────────────────────────────────────────
 
 wss.on('connection', (socket) => {
